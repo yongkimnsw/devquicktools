@@ -1,0 +1,98 @@
+#!/bin/sh
+
+param_count=$#
+
+print_help() {
+	cat << EOF
+
+	post-view.sh <dir1> [dir2] [dir3] ...
+EOF
+}
+
+err() {
+	echo "$@" >&2
+}
+
+log() {
+	echo "$@"
+}
+
+rm_diff_output() {
+	rm -f "$diff_output"
+}
+
+
+if [ $param_count -lt 1 ]; then
+	print_help >&2
+	exit 11
+fi
+
+
+# create diff ouput
+diff_output=$(mktemp --tmpdir=/tmp "post-view-$$-XXXXXXXX.tmp")
+
+log "truncating diff output file... $diff_output"
+
+log "copying '$diff_output' to clipboard"
+echo -n "$diff_output" | xsel --clipboard
+
+# make sure it is writtable
+if ! cat /dev/null > "$diff_output"; then
+	err "not able to write $diff_output"
+
+	rm_diff_output
+	exit 1
+fi
+
+if [ "$R" ]; then
+	R_OPT="--revision-range=$R"
+else
+	R_OPT=""
+fi
+
+# build diff
+while [ $# -gt 0 ]; do
+
+	diff_dir="$1"
+
+	log "building diff... $diff_dir"
+
+	if ! svn info "$diff_dir" > /dev/null 2> /dev/null; then
+		err "$diff_dir not subversion directory"
+
+		rm_diff_output
+		exit 1
+	fi
+
+	
+	if ! ( cd "$diff_dir" && rbt diff --server="$RBT_SERVER" --svn-show-copies-as-adds=n $R_OPT >> "$diff_output" ); then
+		err "post-review failed in directory $diff_dir"
+
+		rm_diff_output
+		exit 1
+	fi	
+
+	shift
+done
+
+if [ -n "$NOPOST" ]; then
+	log "no posting, copying '$diff_output' to clipboard"
+	exit
+fi
+
+log "posting diff... (diff_output=$diff_output)"
+
+review_request=$(rbt post --server="$RBT_SERVER" --diff-filename="$diff_output" --target-groups="Saturn6" --target-people="ryanj, tomasz.zeman, kwonhee" | sed -n 's/.*#\([0-9]\+\).*/\1/p')
+
+# delete diff output
+#rm_diff_output
+
+# check request number
+if [ -z "$review_request" ]; then
+	err "failed to post"
+	exit 1
+fi
+
+
+log "opening review... $review_request"
+/opt/google/chrome/chrome "$RBT_SERVER/r/$review_request/"

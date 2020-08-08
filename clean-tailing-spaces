@@ -1,0 +1,6 @@
+#!/bin/sh
+
+sed -i 's/[[:space:]]\+$//g' "$@"
+#sed -i 's/^[[:space:]]\+$//g;s/\;[[:space:]]\+$/\;/g' "$@"
+
+sed -i -re '$!N;/^\n$/!P;D' "$@"

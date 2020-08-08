@@ -1,0 +1,714 @@
+#!/bin/bash
+
+export PATH=$PATH:/usr/bin:/bin:/sbin
+
+text_red=$(tput setaf 1)
+text_green=$(tput setaf 2)
+text_blue=$(tput setaf 4)
+text_magenta=$(tput setaf 5)
+text_yellow=$(tput setaf 3)
+text_bold=$(tput bold)
+text_rev=$(tput rev)
+text_reset=$(tput sgr0)
+
+export BUILDENV_QC_REPO_REF="/prj2/repo-sdx55"
+export BUILDENV_CAF_REPO_REF="/prj2/repo-caf"
+
+print_usage() {
+	cat << EOF
+
+$BATCH_BUILD_SCRIPT version 1.0
+
+Usage>
+	$BATCH_BUILD_SCRIPT build-<platform>-<variant>-<version or trunk> <commands...>
+
+	platform 	 Platform name
+	variant  	 Platform variant name
+	version  	 Tagged version number
+	command  	 Command to perform.
+
+commands>	
+
+    * project commands
+        build           : build
+        ci|checkin      : subversion check-in
+        co|checkout     : subversion check-out
+        export          : subversion export
+        remove          : remove project
+        scrub           : distclean all projects and staging directories
+        scrub-force     : force to distclean all projects and staging directories
+        scrub-rootfs    : distclean all projects and staging directories (except kernel, openwrt and qcle)
+        source          : checkout with global.sh
+
+    * subproject commands
+        clean|distclean : clean or distclean subproject
+        make            : subproject build
+        force           : clean target only
+        remake          : do 'force' and build subproject
+
+    * subversion commands
+        cleanup                      : svn clean all projects
+        diff                         : subversion diff
+        difftool                     : subversion diff with kdiff3
+        merge <svn-option> ...       : subversion merge
+        resolved                     : subversion resolved
+        resolve                      : subversion resolve
+        revert                       : subversion revert
+        st|status                    : subversion status
+        update                       : subversion update
+
+    * shell commands
+        foreach                      : run command per each svn
+        
+    * information commands
+        info <v variable> ... : print project information
+        rel                   : list up releases
+        help                  : print usage
+
+    * copy and compare commands
+        comp <project>         : compare to a project 
+        copy <project>         : copy a project 
+        uncopy <project>       : uncopy a project
+        merge-branch <project> : merge a project from a different branch
+
+    * extra commands
+        review           : review
+        update-info      : regenerate comment in variants.sh 
+        scan             : build search tree
+        upgrade-hunter   : NFS upgrade for Hunter
+        upgrade ...      : adb upgrade
+        upgrade-factory  : upgrade factory
+        -- <options> ... : run build.sh with options
+
+Example>
+
+    $BATCH_BUILD_SCRIPT build-Serpent_Skunkape-atteng_ifwa40-trunk checkout build
+    $BATCH_BUILD_SCRIPT build-Serpent_Skunkape-atteng_ifwa40-trunk remove
+
+EOF
+}
+
+log() {
+    if [ $# -gt 0 ]; then
+        echo -e "$*"
+    else
+        cat
+    fi
+}
+
+err() {
+    log "$@" 1>&2
+}
+
+log_section() {
+    cat << EOF
+
+${text_yellow}[$(date +'%x %X')] ==========================================================================================================================================================${text_reset}
+EOF
+    if [ $# -gt 0 ]; then
+        log "$@"
+    fi
+    
+}
+
+log_seperate(){
+    log "${text_yellow}==============================================================================================================================================================================${text_reset}"
+}
+
+log_command() {
+    log_section "${text_bold}COMMAND [$command] - $PROJECT_DIR${text_reset}"
+}
+
+print_project_dir() {
+    local _project_dir="$1"
+    readlink -f "$_project_dir" | sed -n "s/\(.*build-[a-zA-Z_0-9]\+-[a-zA-Z_0-9]\+-[A-Za-z0-9_\.-]\+\).*/\1/p"
+}
+
+print_subproject_name() {
+    local _subproject_dir="$1"
+    readlink -f "$_subproject_dir" | sed -rn 's#.*/([^/]+)_src/([^/]+).*#_subplatform="\1";_subproject="\2";#p'
+    readlink -f "$_subproject_dir" | sed -rn 's#.*/([^/]+)_src$#_subplatform="\1";#p'
+}
+
+# convert to parameters to locals
+BATCH_BUILD_SCRIPT=`basename $0`
+SOURCE_DIR="$1"
+shift
+
+# check validation - options count
+if [ $# -lt 1 ]; then
+	err "less parameters - $#"
+	print_usage 1>&2
+	exit 1
+fi
+
+FIND_MAXDEPTH=10
+
+PROJECT_DIR=$(print_project_dir "$SOURCE_DIR")
+PROJECT_NAME=$(basename "$PROJECT_DIR")
+eval $(print_subproject_name "$SOURCE_DIR")
+
+# ccache basedir
+export CCACHE_BASEDIR="$PROJECT_DIR"
+
+if [ -z "$_subplatform" ]; then
+    if [ $(find $PROJECT_DIR -maxdepth 1 -type d -name '*_src' 2> /dev/null | wc -l) -eq 1 ]; then
+        eval $(print_subproject_name $(find $PROJECT_DIR -maxdepth 1 -type d -name '*_src'))
+    fi
+fi
+
+SUBPLATFORM_NAME=$_subplatform
+
+if [ -n "$SUBPLATFORM_NAME" ]; then
+    proj_dirs=($(source "$PROJECT_DIR/platform_$SUBPLATFORM_NAME/all.sh" && echo "$SDR"))
+    proj_names=($(source "$PROJECT_DIR/platform_$SUBPLATFORM_NAME/all.sh" && echo "$ALL"))
+fi
+
+SUBPROJECT_NAME=""
+for i in "${!proj_dirs[@]}"; do
+    if [[ "${proj_dirs[$i]}" = "$_subproject" ]]; then
+        SUBPROJECT_NAME="${proj_names[$i]}"
+    fi
+done
+
+PROJECT_BASE_DIR=$(dirname "$PROJECT_DIR")
+BATCH_BUILD_ROOT="$PROJECT_NAME"
+
+# check validation
+if [ -z "$PROJECT_NAME" ]; then
+	err "project name not specified"
+	exit 1
+fi
+
+# get build parameters
+BATCH_BUILD_PLATYFORM=`echo "$PROJECT_NAME" | sed -n 's/build-\([A-Za-z0-9_]\+\)-\(ntc_140wx-[0-9]\{1,2\}\|ntc_6200-x[1-9]\|ntc_4gt101w-[1-9]\|[A-Za-z0-9_]\+\)-\([A-Za-z0-9_\.]\+\).*/\1/p'`
+BATCH_BUILD_VARIANT=`echo "$PROJECT_NAME" | sed -n 's/build-\([A-Za-z0-9_]\+\)-\(ntc_140wx-[0-9]\{1,2\}\|ntc_6200-x[1-9]\|ntc_4gt101w-[1-9]\|[A-Za-z0-9_]\+\)-\([A-Za-z0-9_\.]\+\).*/\2/p'`
+BATCH_BUILD_VERSION=`echo "$PROJECT_NAME" | sed -n 's/build-\([A-Za-z0-9_]\+\)-\(ntc_140wx-[0-9]\{1,2\}\|ntc_6200-x[1-9]\|ntc_4gt101w-[1-9]\|[A-Za-z0-9_]\+\)-\([A-Za-z0-9_\.]\+\).*/\3/p'`
+
+# get svn build tool url
+if [ "$BATCH_BUILD_VERSION" = "trunk" ]; then
+    svn_build_tool_url="http://svn/main/tools/build/trunk"
+    release_version=""
+else
+    svn_build_tool_url="http://svn/main/tools/build/releases/$BATCH_BUILD_PLATYFORM/R_$BATCH_BUILD_VERSION"
+    release_version="$BATCH_BUILD_VERSION"
+fi
+
+export QSDK_SET_MAKE_VERBOSITY=y
+
+common_preprocedure() {
+    log_section
+    log << EOF
+${text_bold}* environment
+SVN                   : $svn_build_tool_url
+SOURCE_DIR            : $SOURCE_DIR
+PROJECT_BASE_DIR      : $PROJECT_BASE_DIR
+PROJECT_DIR           : $PROJECT_DIR
+PROJECT_NAME          : $PROJECT_NAME
+
+SUBPLATFORM_NAME      : $SUBPLATFORM_NAME
+SUBPROJECT_NAME       : $SUBPROJECT_NAME
+
+BATCH_BUILD_PLATYFORM : $BATCH_BUILD_PLATYFORM
+BATCH_BUILD_VARIANT   : $BATCH_BUILD_VARIANT
+BATCH_BUILD_VERSION   : $BATCH_BUILD_VERSION
+
+* disk space
+$(df -h $PROJECT_BASE_DIR)${text_reset}
+EOF
+
+    SECONDS=0
+}
+
+common_postprocedure() {
+    log_section
+
+    log << EOF
+${text_green}* duration
+$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds
+
+* disk space
+$(df -h $PROJECT_BASE_DIR)${text_reset}
+EOF
+    log_seperate
+}
+
+# perform preprocess
+common_preprocedure
+
+bail_immediately() {
+    log "${text_rev}${text_red}ERROR: $*${text_reset}" >&2
+    exit 1
+}
+
+bail() {
+    common_postprocedure
+    log "${text_rev}${text_red}ERROR: $*${text_reset}" >&2
+    exit 1
+}
+
+find_svn_directories() {
+    local base_dir="$1"
+    find "$base_dir" -maxdepth $FIND_MAXDEPTH -type d -name '.svn' -print ! \( -name '.svn' -prune \) | sed 's#/\.svn$##g'
+    return ${PIPESTATUS[0]}
+}
+
+find_git_directories() {
+    local base_dir="$1"
+    find "$base_dir" -maxdepth $FIND_MAXDEPTH -type d ! \(  -name 'gnu_apps' -prune \) -a -name '.git' -print ! \(  -name '.git' -prune \) | sed 's#/\.git$##g'
+    return ${PIPESTATUS[0]}
+}
+
+
+filter_svn_file_names() {
+    cut -b9-
+}
+
+is_output_empty() {
+    test "$(wc -c)" -eq 0
+}
+
+filter_dir_to_commit() {
+    while read i; do
+        svn st -q "$i" | is_output_empty || echo "$i"
+    done
+    
+    return 0
+}
+
+check_svn_directories() {
+    find_svn_directories "$1" | xargs -d '\n' -r svn st -q
+    test "${PIPESTATUS[0]}" -eq 0 -a "${PIPESTATUS[1]}" -eq 0
+}    
+
+print_new_variants_sh() {
+    local ignore=""
+    
+    cat "$PROJECT_DIR/platform_$SUBPLATFORM_NAME/variants.sh" | while IFS= read -r line; do
+    
+        case "$line" in
+            '# START VDOC')
+                ignore="y"
+                echo "$line" 
+                echo ""
+                ( cd "$PROJECT_DIR/platform_$SUBPLATFORM_NAME" && . variants.sh && selftest ) || exit $?
+                ;;
+                
+            '# END VDOC')
+                ignore=""
+                echo ""
+                echo "$line"
+                ;;
+
+            *)
+                if [ ! "$ignore" ]; then
+                    echo "$line" 
+                fi
+        esac
+        
+    done
+    
+}
+
+update_variants_sh() {
+    print_new_variants_sh > ~/tmp/variants.sh-$$ || bail "failed to generate variants.sh"
+    clean_spaces.sh ~/tmp/variants.sh-$$
+    if ! cmp <(egrep -v '# V_TIMESTAMP' ~/tmp/variants.sh-$$) <(egrep -v '# V_TIMESTAMP' "$PROJECT_DIR/platform_$SUBPLATFORM_NAME/variants.sh"); then
+        mv ~/tmp/variants.sh-$$ "$PROJECT_DIR/platform_$SUBPLATFORM_NAME/variants.sh"
+        echo "* updated - $PROJECT_DIR/platform_$SUBPLATFORM_NAME/variants.sh"
+    fi
+    rm -f ~/tmp/variants.sh-$$
+}
+
+do_preprocess() {
+    rm -f "$PROJECT_DIR/compat/ldconfig" "$PROJECT_DIR/compat/make"
+
+    cat > "$PROJECT_DIR/scripts/runlog" << EOF 
+#!/bin/bash
+echo "[runlog] \$*"
+shift 8
+exec "\$@"
+EOF
+    chmod a+x "$PROJECT_DIR/scripts/runlog"
+}
+
+# for each argument
+while [ $# -gt 0 ]; do
+    command="$1"
+    shift
+
+    log_command
+
+    case "$command" in
+        'co'|'checkout'|'export')
+            ls "$PROJECT_DIR"/* 2> /dev/null > /dev/null && bail "already checked out"
+
+            log "create build directory - '$PROJECT_DIR'"
+            if ! btrfs subvolume create "$PROJECT_DIR"; then
+                mkdir -p "$PROJECT_DIR" || bail "failed to create project directory"
+            fi
+
+            log "check out build - $svn_build_tool_url"
+            svn "$command" "$svn_build_tool_url" "$PROJECT_DIR" --force || bail "failed in svn-co"
+            
+            do_preprocess
+            ;;
+        
+        'rel')
+            svn ls http://svn/main/tools/build/releases/${BATCH_BUILD_PLATYFORM} -v | sort -n
+            log_seperate
+            svn info $PROJECT_DIR
+            test "${PIPESTATUS[0]}" -eq 0 || bail "failed in svn-info"
+            ;;
+            
+        'update-info')
+            update_variants_sh
+            ;;
+        
+        'info')
+            ls "$PROJECT_DIR"/*"_history/variant.sh" | while read v; do
+
+                (
+                    source $v
+
+                    platform=$(echo "$v" | sed -rn 's#.*/(.*)_history/.*#\1#p')
+
+                    log << EOF
+
+        * platform : [$platform]
+            # variant information
+                variant orig.   : [$(readlink -f "$PROJECT_DIR/platform_${platform}/variants.sh")]
+                variant history : [$v]
+                platform        : $platform
+                product         : $V_PRODUCT
+                board           : $V_BOARD
+                ioboard         : $V_IOBOARD
+                processor       : $V_PROCESSOR
+                sdram size      : $V_SDRAMSIZE
+                kconfig         : $V_KCONFIG
+                toolchain       : $V_TOOLCHAIN
+                cross compiler  : $V_CROSS
+                Qualcomm dist.  : $V_QC_DIST
+            # directories
+                $(readlink -f "$PROJECT_DIR/${platform}_bin")
+                $(readlink -f "$PROJECT_DIR/${platform}_history")
+                $(readlink -f "$PROJECT_DIR/platform_${platform}")
+                $(readlink -f "$PROJECT_DIR/${platform}_src")
+                $(readlink -f "${V_TOOLCHAIN}/bin")
+            # includes
+                $(readlink -f "$PROJECT_DIR/${platform}_src/staging_l/include")
+                $(dirname $(ls -d  "${V_TOOLCHAIN}"/*/"sysroot/usr/include"/syscall.h "${V_TOOLCHAIN}"/include/syscall.h 2> /dev/null ))
+            # path export
+                export PATH=\$PATH:${V_TOOLCHAIN}/bin
+EOF
+                )
+            done
+
+            if [ "${#proj_names[@]}" -gt 0 ]; then
+                log_seperate
+                cat << EOF
+# $SUBPLATFORM_NAME project names :
+    ${proj_names[@]}
+EOF
+            fi
+            
+            test "${PIPESTATUS[0]}" -eq 0  || bail "failed to get *_history/variant.sh"
+
+            # grep v variable
+            grep_option=("$@")
+            if [ "$#" -gt 0 ]; then
+                log_seperate
+                shift $#
+                ls "$PROJECT_DIR"/*"_history/variant.sh" | while read v; do
+                    platform=$(echo "$v" | sed -rn 's#.*/(.*)_history/.*#\1#p')
+                    cat << EOF
+
+variant orig.   : [$(readlink -f "$PROJECT_DIR/platform_${platform}/variants.sh")]
+variant history : [$v]
+EOF
+                    grep "${grep_option[@]}" "$v"
+                done
+            fi
+            ;;
+
+        'revert')
+            log "* local project to revert [$PROJECT_DIR]"
+            check_svn_directories "$PROJECT_DIR" || bail "failed in svn-st"
+            
+            log_seperate
+            i=""
+            required=$(printf "%05d" "$RANDOM")
+            read -p "please type '$required' to perform revert: " i
+            test "$i" = "$required" || bail "revert cancelled"
+            xargs -d '\n' -r -a <(find_svn_directories "$PROJECT_DIR") svn revert -R
+            test "${PIPESTATUS[0]}" -eq 0 || bail "failed to revert"
+            ;;
+            
+        'comp')
+            test $# -lt 1 && bail "syntax error. usage) $BATCH_BUILD_SCRIPT <target project> comp <source project>"
+
+            source_project_dir=$(print_project_dir "$1")
+            shift
+
+            log_seperate
+            log "* foreign project [$source_project_dir]"
+            check_svn_directories "$source_project_dir" || bail "failed to check source project - '$source_project_dir'"
+
+            log_seperate
+            log "* compare to local project [$PROJECT_DIR]"
+            while read -u 10 i; do
+                log "${text_magenta}===> $i${text_reset}"
+                kdiff3 "$source_project_dir/$i" "$PROJECT_DIR/$i"
+            done 10< <(cd "$source_project_dir" && find_svn_directories "." | xargs -d '\n' -r svn st -q | filter_svn_file_names )
+            test "${PIPESTATUS[0]}" -eq 0 || bail "failed in walking through svn directories."
+            ;;
+        
+        'copy'|'uncopy')
+            test $# -lt 1 && bail "syntax error. usage) $BATCH_BUILD_SCRIPT <target project> copy <source project>"
+
+            source_project_dir=$(print_project_dir "$1")
+            shift
+
+            log << EOF
+* info            
+source: [$source_project_dir]
+target: [$PROJECT_DIR]
+EOF
+            log_seperate
+            log "* foreign project [$source_project_dir]"
+            check_svn_directories "$source_project_dir" || bail "failed in svn-st - '$source_project_dir'"
+
+            log_seperate
+            
+            log "* copy to local project [$PROJECT_DIR]"
+            
+            if [ "$command" = "copy" ]; then
+                patch_option=""
+            else
+                patch_option="--reverse-diff"
+            fi
+            
+            while read -u 10 i; do
+                log "${text_magenta}===> $i${text_reset}"
+
+                tmpfile=$(mktemp "/tmp/svn-diff-$$-XXXXXX")
+                
+                (cd "$source_project_dir/$i" && svn diff --diff-cmd=diff --patch-compatible) > "$tmpfile" || { rm -f "$tmpfile"; bail_immediately "failed in svn-diff - '$source_project_dir/$i'"; }
+                (cd "$PROJECT_DIR/$i" && svn patch $patch_option "$tmpfile" | sed "s#^C#${text_bold}C${text_reset}#g") || { rm -f "$tmpfile"; bail_immediately "failed in svn-diff - '$PROJECT_DIR/$i'"; }
+
+                cd "$source_project_dir/$i" && \
+                    svn st -q | sed -r 's/^[^[:space:]].*[[:space:]]+//g' | \
+                        xargs -i find '{}' -maxdepth 0 -type l -print0 | \
+                            xargs -0 -r cp --remove-destination --parents -av -t "$PROJECT_DIR/$i"
+
+                rm -f "$tmpfile"
+            done 10< <(cd "$source_project_dir" && find_svn_directories "." | filter_dir_to_commit)
+            test $? -eq 0 || bail "failed in walking through svn directories."
+            ;;
+
+        'foreach')
+            opts=$(echo -n "$@" | xargs -n 1 -d ' ' -i echo "'{}'" | tr '\n' ' ')
+            (cd "$PROJECT_DIR" && xargs -d '\n' -n 1 -i -r -a <(find_svn_directories "$PROJECT_DIR") bash -c "cd '{}' && $opts")
+            shift $#
+            test "${PIPESTATUS[0]}" -eq 0 || bail "failed foreach"
+            ;;
+            
+        'merge')
+            opts=$(echo -n "$@" | xargs -n 1 -d ' ' -i echo "'{}'" | tr '\n' ' ')
+            (cd "$PROJECT_DIR" && xargs -d '\n' -n 1 -i -r -a <(find_svn_directories "$PROJECT_DIR") bash -c "cd '{}' && svn '$command' $opts")
+            shift $#
+            test "${PIPESTATUS[0]}" -eq 0 || bail "failed in svn-merge"
+            ;;
+            
+        'merge-branch')
+            test $# -lt 2 && bail "syntax error. usage) $BATCH_BUILD_SCRIPT <target project> merge-branch <source project> <svn diff option>"
+
+            source_project_dir=$(print_project_dir "$1")
+            merge_svn_option="$2"
+            shift 2
+
+            cat << EOF
+* merge info
+source     : $source_project_dir
+target     : $PROJECT_DIR
+svn option : $*
+EOF
+            log_seperate
+            
+            svn log http://svn/main -v "$merge_svn_option" | log
+            log_seperate
+            
+            while read -u 10 i; do
+                log "${text_magenta}===> $i${text_reset}"            
+                if ! svn diff --diff-cmd=diff "$source_project_dir/$i" "$merge_svn_option" | is_output_empty; then
+                    svn diff --diff-cmd=diff "$source_project_dir/$i" "$merge_svn_option" | grep '^Index: '
+                    svn merge -v "$source_project_dir/$i" "$PROJECT_DIR/$i" "$merge_svn_option" || bail "failed in svn-merge '$source_project_dir/$i' ==> $PROJECT_DIR/$i"
+                    log_seperate
+                fi
+                test "${PIPESTATUS[0]}" -eq 0 || bail "failed in svn-diff - '$source_project_dir/$i' ==> $PROJECT_DIR/$i"
+            done 10< <(cd "$PROJECT_DIR" && find_svn_directories ".")
+            ;;
+
+        'diff')
+            find_svn_directories "$PROJECT_DIR" | filter_dir_to_commit | xargs -d '\n' -r svn diff --diff-cmd=diff
+            xargs -d '\n' -n 1 -r -i -a <(find_git_directories "$PROJECT_DIR") sh -c '(echo {}; git -C {} diff HEAD; echo;)'
+            test "${PIPESTATUS[0]}" -eq 0 -a "${PIPESTATUS[1]}" -eq 0 -a "${PIPESTATUS[2]}" -eq 0 || bail "failed in svn-diff"
+            ;;
+
+        'difftool')
+            find_svn_directories "$PROJECT_DIR" | filter_dir_to_commit | xargs -d '\n' -r svn diff
+            xargs -d '\n' -n 1 -r -i -a <(find_git_directories "$PROJECT_DIR") sh -c '(echo {}; git -C {} difftool HEAD; echo;)'
+            test "${PIPESTATUS[0]}" -eq 0 -a "${PIPESTATUS[1]}" -eq 0 -a "${PIPESTATUS[2]}" -eq 0 || bail "failed in svn-diff"
+            ;;
+
+        'review')
+            check_svn_directories "$PROJECT_DIR" || bail "failed to check"
+            log_seperate
+            (cd "$PROJECT_DIR" && find_svn_directories "$PROJECT_DIR" | filter_dir_to_commit | xargs -d '\n' -r post-review.sh)
+            test "${PIPESTATUS[0]}" -eq 0 || bail "failed to post"
+            ;;
+
+        'remove')
+            TEMPDIR=$(mktemp -d $PROJECT_BASE_DIR/tmp/$BATCH_BUILD_SCRIPT.$$.XXXXXX)
+            mv "$PROJECT_DIR" "$TEMPDIR" || bail "cannot remove project"
+
+            echo "project moved to [$TEMPDIR]"
+            ;;
+
+        'cleanup'|'update'|'up'|'ci'|'checkin'|'st'|'status'|'resolve'|'resolved')
+            st_svn_options=""
+            test "$command" = "st" -o "$command" = "status" && st_svn_options="-q"
+            (cd "$PROJECT_DIR" && xargs -d '\n' -r -a <(find_svn_directories "$PROJECT_DIR") svn "$command" "$st_svn_options")
+
+             case "$command" in
+                 'st'|'status')
+                     log_seperate
+                     xargs -d '\n' -n 1 -r -i -a <(find_git_directories "$PROJECT_DIR") sh -c '(echo {}; git -C {} status; git -C {} branch -v; echo; )'
+                     ;;
+                 'up'|'update')
+                     log_seperate
+                     xargs -d '\n' -n 1 -r -i -a <(find_git_directories "$PROJECT_DIR") sh -c '(echo {}; git -C {} pull; echo; )'
+                     ;;
+             esac
+            ;;
+
+        'scan')
+            ls -d "$PROJECT_DIR/Cassini_src/qcle/sdx55"*/* 2> /dev/null > "$PROJECT_DIR/.mlocateignore"
+            b "$PROJECT_DIR" || bail "failed to scan"
+            ls -d "$PROJECT_DIR/Cassini_src/qcle/sdx55-le-1-0_amss_standard_casa/"* | xargs -i -r b '{}' || bail "failed to scan" 
+            ;;
+
+        'upgrade-hunter')
+            ls -td "$PROJECT_DIR/"*"_bin/"*"X.zip" | head -n 1 | xargs -d '\n' -r -i hunter-nfs-upgrade.sh '{}' "$@"
+            test "${PIPESTATUS[0]}" -eq 0 -a "${PIPESTATUS[1]}" -eq 0 -a "${PIPESTATUS[2]}" -eq 0 || bail "failed to upgrade"
+            shift $#
+            ;;
+
+        'upgrade')
+            ls -td "$PROJECT_DIR/"*"_bin/"*"X.zip" | head -n 1 | xargs -d '\n' -r -i serpent-adb-upgrade.sh '{}' "$@"
+            test "${PIPESTATUS[0]}" -eq 0 -a "${PIPESTATUS[1]}" -eq 0 -a "${PIPESTATUS[2]}" -eq 0 || bail "failed to upgrade"
+            shift $#
+            ;;
+
+        'upgrade-factory')
+            ls -td "$PROJECT_DIR/"*"_bin/"*"-factory.zip" | head -n 1 | xargs -d '\n' -r -i serpent-adb-upgrade.sh '{}' "$@"
+            test "${PIPESTATUS[0]}" -eq 0 -a "${PIPESTATUS[1]}" -eq 0 -a "${PIPESTATUS[2]}" -eq 0 || bail "failed to upgrade"
+            shift $#
+            ;;
+        'force'|'clean'|'distclean')
+            test -n "$SUBPROJECT_NAME" || bail "subproject not specified"
+            BATCH_BUILD_PLATYFORM="$SUBPLATFORM_NAME"
+            BATCH_BUILD_VARIANT=$(source $PROJECT_DIR/${SUBPLATFORM_NAME}_history/variant.sh && echo "$V_PRODUCT")
+            (cd "$PROJECT_DIR" && PRIMARY_PLATFORM_ONLY="y" RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" "$SUBPROJECT_NAME" "$command") || bail "failed to $command"
+            ;;
+
+        'makedebug')
+            do_preprocess
+            test -n "$SUBPROJECT_NAME" || bail "subproject not specified"
+            BATCH_BUILD_PLATYFORM="$SUBPLATFORM_NAME"
+            BATCH_BUILD_VARIANT=$(source $PROJECT_DIR/${SUBPLATFORM_NAME}_history/variant.sh && echo "$V_PRODUCT")
+            (cd "$PROJECT_DIR" && PRIMARY_PLATFORM_ONLY="y" RELEASE="$release_version" ./build.sh --makedebug "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" "$SUBPROJECT_NAME") || bail "failed to $command"
+            ;;
+
+        'make')
+            do_preprocess
+            test -n "$SUBPROJECT_NAME" || bail "subproject not specified"
+            BATCH_BUILD_PLATYFORM="$SUBPLATFORM_NAME"
+            BATCH_BUILD_VARIANT=$(source $PROJECT_DIR/${SUBPLATFORM_NAME}_history/variant.sh && echo "$V_PRODUCT")
+            (cd "$PROJECT_DIR" && PRIMARY_PLATFORM_ONLY="y" RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" "$SUBPROJECT_NAME") || bail "failed to $command"
+            ;;
+
+        'remake')
+            do_preprocess
+            test -n "$SUBPROJECT_NAME" || bail "subproject not specified"
+            BATCH_BUILD_PLATYFORM="$SUBPLATFORM_NAME"
+            BATCH_BUILD_VARIANT=$(source $PROJECT_DIR/${SUBPLATFORM_NAME}_history/variant.sh && echo "$V_PRODUCT")
+            (cd "$PROJECT_DIR" && PRIMARY_PLATFORM_ONLY="y" RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" "$SUBPROJECT_NAME" force) || bail "failed to $command"
+            log_seperate
+            (cd "$PROJECT_DIR" && PRIMARY_PLATFORM_ONLY="y" RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" "$SUBPROJECT_NAME") || bail "failed to $command"
+            ;;
+            
+        'build')
+            do_preprocess
+            export BUILDENV_OPENWRT_DL_DIR="/prj2/cache/openwrt-dl"
+            (cd "$PROJECT_DIR" && RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT") || bail "failed in '$command'"
+            ;;
+            
+        'source')
+            export BUILDENV_OPENWRT_DL_DIR="/prj2/cache/openwrt-dl"
+            (cd "$PROJECT_DIR" && ./global.sh --checkout "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" ${release_version:+-r $release_version} ) || bail "failed in '$command'"
+            ;;
+            
+        'scrub-force'|'scrub-rootfs'|'scrub')
+            test "${#proj_names[@]}" -gt 0 || bail "subproject not specified"
+            (
+                cd "$PROJECT_DIR" || exit $?
+                echo "force project: ${proj_names[@]}"
+                if [ "$command" = "scrub" ]; then
+                    RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" all distclean || bail_immediately "failed to distclean all"
+                else
+                    for p in ${proj_names[@]}; do
+                        log_seperate
+                        if [ "$command" = "scrub-rootfs" -a "$p" = "qcle" ]; then
+                            echo "skip kernel"
+                        elif [ "$command" = "scrub-rootfs" -a "$p" = "kernel" ]; then
+                            echo "skip kernel"
+                        elif [ "$command" = "scrub-rootfs" -a "$p" = "openwrt" ]; then
+                            echo "skip openwrt"
+                        elif [ "$p" = "sdk" ]; then
+                            echo "skip sdk"
+                        else
+                            RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" "$p" distclean || RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" "$p" force
+                        fi
+                    done
+                fi
+                rm -fr "${BATCH_BUILD_PLATYFORM}_src/staging" "${BATCH_BUILD_PLATYFORM}_src/staging_"* "${BATCH_BUILD_PLATYFORM}_history" "${BATCH_BUILD_PLATYFORM}_bin"
+                find "${BATCH_BUILD_PLATYFORM}_src" -maxdepth $FIND_MAXDEPTH -type f -name '*.done' | xargs rm -f
+            ) || bail "failed to $command"
+            ;;
+            
+        'help')
+            print_usage
+            log_seperate
+            (cd "$PROJECT_DIR" && ./build.sh)
+            ;;
+            
+        'cd')
+            cd "$PROJECT_DIR" && exec bash
+            ;;
+
+        '--')
+            (cd "$PROJECT_DIR" && RELEASE="$release_version" ./build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" "$@") || bail "failed to perfrom './build.sh "$BATCH_BUILD_PLATYFORM" "$BATCH_BUILD_VARIANT" $@'"
+            shift $#
+            ;;
+
+        *)
+            bail "unknown command specified - '$command'"
+            ;;
+    esac
+
+done
+
+common_postprocedure
+
+exit 0
