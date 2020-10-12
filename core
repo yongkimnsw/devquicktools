@@ -235,6 +235,16 @@ command_u() {
     smart_history_update
 }
 
+command_d() {
+    if svn info > /dev/null 2> /dev/null; then
+        svn diff
+    elif git status > /dev/null 2> /dev/null; then
+        git diff
+    else
+        echo "No source control found"
+    fi
+}
+
 command_s() {
     [ "$#" = 0 ] || cd "$@"
     print_sep ""
@@ -374,7 +384,7 @@ kill_children() {
     exit 0
 }
 
-commmand_r() {
+command_r() {
 
     trap "kill_children" SIGINT
 
@@ -385,6 +395,43 @@ commmand_r() {
     done
 }
 
+
+command_cs() {
+    basedir="$1"
+    test -z "$basedir" && basedir=$(pwd)
+
+    cat_name_files() {
+        echo "*.[ch] *.py *.cc *.cpp *.html *.inc *.css *.js *.asp *.dts *.dtsi *.lua *.sh *.lua *.S *.html *.htm *.js Kconfig Makefile" | sed -n '
+            /[^[:space:]]\+[[:space:]]\+/ {
+                s/\([^[:space:]]*\)[[:space:]]\+/-name "\1" -or /g
+            }
+            /[^[:space:]]\+$/ {
+                s/\([^[:space:]]\+\)$/-name "\1"/g
+            }
+
+            p
+        '
+    }
+
+    find_source() {
+        FILES=$(cat_name_files)
+        eval "find ! \\( -name .svn -o -name tmp-glibc -o -name html -prune \\) -readable -type f \\( $FILES \\)"
+    }
+
+    bail() {
+        echo "$*" >&2
+        exit 1
+    }
+
+    echo "* finding source files to cscope.files"
+    find_source | tee cscope.files || bail "failed in finding files"
+
+    echo "* build cscope"
+    #cscope -buvq
+    cscope -buv
+    readlink -f cscope.out
+}
+
 command_core() {
     # get dest
     dest="$2"
@@ -392,18 +439,25 @@ command_core() {
         dest=$(pwd)
     fi
     [ -d "$dest" ] || bail "destination not directory"
+    dest="${dest%/}"
+
+    rcommand=$(readlink -f "$fcommand")
 
     case "$1" in
         install)
             for i in $(echo "$command_list" | sed 's/|/ /g'); do
-                echo -e "installing... [$i]"
-                ln -s "$fcommand" -T "$dest/$i" || bail "failed to install $i"
+                echo -e "installing... $dest/$i"
+                if [ -L "$dest/$i" ] || ! [ -e $dest/$i ]; then
+                    ln -sf "$rcommand" -T "$dest/$i"
+                else
+                    bail "failed to install $dest/$i"
+                fi
             done
             ;;
 
         uninstall)
             for i in $(echo "$command_list" | sed 's/|/ /g'); do
-                echo -e "uninstalling... [$i]"
+                echo -e "uninstalling... $dest/$i"
                 ! [ -L "$dest/$i" ] || rm "$dest/$i"
             done
             ;;
@@ -449,6 +503,10 @@ commnads)
         ge <git options>    : git for each directory
 
     * misc
+        r [command]     : repeat command
+        cs              : build cscope
+
+    * management
         install     : install quick commands
         uninstall   : uninstall quick commands
         help        : help
@@ -457,7 +515,7 @@ EOF
 
 }
 
-command_list="core|a|b|c|ge|p|s|u|t|tm|f|fm|fd|r"
+command_list="core|a|b|c|ge|p|s|u|t|tm|f|fm|fd|r|d|cs"
 
 # parse command
 fcommand="$0"
@@ -481,8 +539,8 @@ case "$subcommand" in
         command_tf -f -m "$@"
         ;;
 
-    $command_list)
-        "command_$subcommand" "$@"
+    *)
+        ! echo "$command_list" | grep -q "\b$subcommand\b" || "command_$subcommand" "$@"
         ;;
 
 esac
