@@ -163,6 +163,11 @@ grep_pwd_and_remove() {
     grep "^$dir_to_remove/" | sed -ru "s%^$dir_to_remove/(.*)%./\1%g"
 }
 
+bail() {
+    echo "$*" >&1
+    exit 1
+}
+
 # search locate database
 command_tf() {
 
@@ -359,27 +364,47 @@ command_ge() {
     fi
 }
 
-bail() {
-    echo "$*" >&1
+command_fd() {
+    fdfind -IHp "$@"
 }
 
-command_q() {
-    local dcommand="$(dirname "$fcommand")"
+
+kill_children() {
+    pkill "$$"
+    exit 0
+}
+
+commmand_r() {
+
+    trap "kill_children" SIGINT
+
+    while true; do
+        echo ""
+        echo "=================================== $(date)  =================================== "
+        "$@";
+    done
+}
+
+command_core() {
+    # get dest
+    dest="$2"
+    if [ "x$dest" = "x" ]; then
+        dest=$(pwd)
+    fi
+    [ -d "$dest" ] || bail "destination not directory"
 
     case "$1" in
         install)
-            for i in a b c ge p s u t tm f fm; do
-                ln -s "$dcommand/core" -T "$i" || bail "failed to install $i"
+            for i in $(echo "$command_list" | sed 's/|/ /g'); do
+                echo -e "installing... [$i]"
+                ln -s "$fcommand" -T "$dest/$i" || bail "failed to install $i"
             done
             ;;
 
         uninstall)
-            for i in a b c ge p s u t tm f fm; do
-                ofile="$(readlink -f "$i")"
-                bname="$(basename -- "$ofile")"
-
-                [ "xcore" = "x$bname" ] || bail "failed to uninstall $i"
-                rm $i
+            for i in $(echo "$command_list" | sed 's/|/ /g'); do
+                echo -e "uninstalling... [$i]"
+                ! [ -L "$dest/$i" ] || rm "$dest/$i"
             done
             ;;
 
@@ -388,23 +413,6 @@ command_q() {
             ;;
     esac
 }
-
-# bash settings
-set -o vi
-
-# alias
-alias clipboard="xsel --clipboard"
-alias a=""
-alias mc='source /usr/lib/mc/mc-wrapper.sh --nomouse'
-alias fd='fdfind -IHp'
-
-# editors
-export SVN_EDITOR=vi
-export VISUAL=vim
-export EDITOR="$VISUAL"
-
-PS1='[${debian_chroot:+($debian_chroot)}\[\033[01;34m\]\W\[\033[00m\]]\$ '
-
 
 print_usage() {
     cat << EOF
@@ -432,8 +440,9 @@ commnads)
         c [regex]   : do smart CD
         u           : read directory history from disk.
 
-    * text search
-        a : ag
+    * external tools search
+        a   : ag for all with ignore .svn and .git
+        fd  : fd for all with case ignored
 
     * version control utilities
         s                   : get state of SVN or GIT
@@ -443,21 +452,16 @@ commnads)
         install     : install quick commands
         uninstall   : uninstall quick commands
         help        : help
+
 EOF
 
 }
 
+command_list="core|a|b|c|ge|p|s|u|t|tm|f|fm|fd|r"
+
 # parse command
 fcommand="$0"
-command=$(basename -- "$fcommand")
-
-# use the first argument if core is used
-if [ "x$command" = "xcore" ]; then
-    subcommand="q"
-    shift
-else
-    subcommand="$command"
-fi
+subcommand=$(basename -- "$fcommand")
 
 # parse subcommand
 case "$subcommand" in
@@ -477,8 +481,10 @@ case "$subcommand" in
         command_tf -f -m "$@"
         ;;
 
-    a|b|c|ge|p|s|u|q)
+    $command_list)
         "command_$subcommand" "$@"
         ;;
 
 esac
+
+exit 0
