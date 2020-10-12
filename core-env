@@ -187,6 +187,12 @@ alias cb="xsel --clipboard"
 alias m='source /usr/lib/mc/mc-wrapper.sh --nomouse'
 alias c='smart_cd'
 
+# complete
+complete -cf rn
+complete -cf rq
+complete -cf e
+complete -cf sux
+
 # editors
 export SVN_EDITOR=vi
 export VISUAL=vim

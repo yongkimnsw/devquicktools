@@ -300,13 +300,21 @@ command_core() {
 }
 
 command_rn() {
-    nohup "$@" &> /dev/null &
+     XAUTHORITY=~/.Xauthority "$@"
 }
 
-command_e() {
+command_rq() {
+    command_rn "$@" &> /dev/null
+}
+
+command_sux() {
+    sudo DISPLAY=$DISPLAY XAUTHORITY=~/.Xauthority "$@"
+}
+
+command_x() {
     dest="$1"
     dest=${dest:-.}
-    command_rn konqueror $dest
+    command_rn xdg-open $dest
 }
 
 print_usage() {
@@ -344,9 +352,11 @@ commnads)
         ge <git options>    : git for each directory
 
     * utilities
-        r [command]     : repeat command
-        rn [command]    : redirect stdout and stderr to null
-        e [directory]   : konqueror
+        r [command]              : repeat command
+        rn [command]             : run with xauthroity
+        rq [command]             : do rn with stdout and stderr redirected to null
+        x <command or directory> : xdg-open by rn
+        sux <command>            : sudo with xauthority
 
     * alias
         cb              : clipboard
@@ -361,7 +371,7 @@ EOF
 
 }
 
-command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs|rn|e"
+command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux"
 
 # parse command
 fcommand="$0"
