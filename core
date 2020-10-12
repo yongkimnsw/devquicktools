@@ -222,7 +222,7 @@ command_r() {
     while true; do
         echo ""
         echo "=================================== $(date)  =================================== "
-        "$@";
+        "$@"
     done
 }
 
@@ -300,7 +300,7 @@ command_core() {
 }
 
 command_rn() {
-     XAUTHORITY=~/.Xauthority "$@"
+     XAUTHORITY=~/.Xauthority exec "$@"
 }
 
 command_rq() {
@@ -308,7 +308,7 @@ command_rq() {
 }
 
 command_sux() {
-    sudo DISPLAY=$DISPLAY XAUTHORITY=~/.Xauthority "$@"
+    exec sudo DISPLAY=$DISPLAY XAUTHORITY=~/.Xauthority "$@"
 }
 
 command_x() {
