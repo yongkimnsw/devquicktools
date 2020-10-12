@@ -1,5 +1,184 @@
 #!/bin/bash
 
+text_red=$(tput setaf 1)
+text_green=$(tput setaf 2)
+text_blue=$(tput setaf 4)
+text_magenta=$(tput setaf 5)
+text_yellow=$(tput setaf 3)
+text_bold=$(tput bold)
+text_rev=$(tput rev)
+text_reset=$(tput sgr0)
+
+sed_remove_index() {
+    sed -r 's/^[[:space:]]*[0-9]+[[:space:]]+//g'
+}
+
+sed_exclude_0_index() {
+    sed -r "/^[[:space:]]*0[[:space:]]+/d"
+}
+
+smart_pwd() {
+    echo "$PWD" | sed -r "s#^$HOME($|/)#~\1#g"
+}
+
+smart_pwd_escaped() {
+    smart_pwd | sed -r 's/\(/\\(/g;s/\)/\\)/g;'
+}
+
+smart_popd() {
+    for i in $(dirs -v | sort -rn -k 1 | sed -rn "s#^[[:space:]]*([1-9]+[0-9]*)[[:space:]]+$(smart_pwd_escaped)\$#\1#p"); do
+        popd -n "+$i" > /dev/null
+    done
+}
+
+sed_pushd() {
+    sed -rn 's#(.*)#pushd -n "\1" > /dev/null#p'
+}
+
+smart_history_update() {
+    # push current directory
+    smart_popd
+    pushd -n "$(smart_pwd)" > /dev/null
+
+    # merge memory history into stored history
+    (dirs -v | sed_remove_index; cat ~/.dirstack 2> /dev/null;) | sort -ur > ~/.dirstack.$$
+    mv -f ~/.dirstack.$$ ~/.dirstack
+
+    # load stored history
+    dirs -c
+    source <( cat ~/.dirstack 2> /dev/null | sed_pushd)
+}
+
+smart_history_show() {
+
+    echo ""
+    dirs -v | sed_exclude_0_index | sed -r 's/^ ([0-9] )/\1  /g;s/^([0-9][0-9] )/\1 /g;' | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\1\2\3\4 [\2]#p;" | sort -u -k 2 |
+        sed -r "s#^([[:space:]]*[0-9]+[[:space:]]+$(smart_pwd_escaped)[[:space:]]+\[[0-9]+\])\$#$text_magenta\1*$text_reset#g;"
+
+    echo ""
+}
+
+smart_seq() {
+    eval $(
+        sed -rn '
+            /^([0-9]+)-([0-9]+)$/ {
+                s/^([0-9]+)-([0-9]+)$/seq \1 \2;/p
+            }
+
+            /^([0-9]+)$/ {
+                s/^([0-9]+)$/echo \1;/p
+            }
+        '
+    )
+}
+
+egrep_pwd() {
+    _pwd=$(smart_pwd_escaped)
+    egrep "$@" "^[[:space:]]*[0-9]+[[:space:]]+${_pwd}\$"
+}
+
+dirsv_without_0_index() {
+    dirs -v | sed_exclude_0_index | egrep_pwd -v
+}
+
+sed_dir_only() {
+    head -n 1 | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\4#p;"
+}
+
+print_parent_dirs() {
+    (
+        smart_pwd
+        while true; do
+            if [ "x$PWD" = "x/" ]; then
+                break
+            fi
+
+            cd .. 2> /dev/null
+            smart_pwd
+        done
+    )
+}
+
+c() {
+    cdir=""
+    if [ "$#" -eq 0 ]; then
+        #smart_wcd . > /dev/null
+        smart_history_show
+        return 0
+    elif [ "x$1" = "x!" ]; then
+        shift
+
+        rm -f ~/.dirstack*
+
+        if [ "$#" -eq 0 ]; then
+            dirs -c
+        else
+            re='(^[0-9]+$|^[0-9]+-[0-9]+$)'
+            for j in "$@"; do
+
+                if [[ "$j" =~ $re ]]; then
+                    for i in $(echo "$j" | tr ' ' '\n'| smart_seq | sort -rn); do
+                        echo "delete $(dirs +$i)"
+                        popd -n "+$i" > /dev/null
+                    done
+                else
+                    for i in $(dirsv_without_0_index | egrep "$j" | sed -rn 's/^[[:space:]]*([0-9]+).*/\1/p' | sort -rn); do
+                        echo "delete $(dirs +$i)"
+                        popd -n "+$i" > /dev/null
+                    done
+                fi
+            done
+        fi
+
+        smart_history_update
+        return 0
+
+    elif [ -e "$1" ] && [ ! -d "$1" ]; then
+        eval /usr/bin/wcd.exec -i -q -c $(dirname "$1") || return $?
+    else
+        if [ "$1" = '=' -o "$1" = '-' -o "$1" = '+' -o "${1}" = ".." -o "${1}" = "." ]; then
+            cdir="$1"
+        elif (cd "$@") 2> /dev/null; then
+            sdir=""
+        else
+            sdir=""
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
+
+            while read i; do
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*/$*$" | sed_dir_only)
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*/$*" | sed_dir_only)
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*$*" | sed_dir_only)
+            done < <(print_parent_dirs)
+
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "/$*$" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "/$*" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$*" | sed_dir_only)
+        fi
+
+        sdir=${sdir/#~\//$HOME\/}
+
+        if [ -z "$cdir" ]; then
+            /usr/bin/wcd.exec -i -q -c "${sdir:-$*}" || return $?
+        fi
+    fi
+
+    if [ -z "$cdir" ]; then
+        grep -q "cd" ~/bin/wcd.go 2> /dev/null || return $?
+        source ~/bin/wcd.go || return $?
+    else
+        cd "$cdir"
+    fi
+
+    if [ -t 1 ]; then
+        smart_history_update
+        echo "$text_magenta== [cd] $(dirs -v | sed_exclude_0_index | egrep_pwd | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\1\2\3\4 [\2]#p;") ==$text_reset"
+    fi
+
+    #echo -ne "\033]30;$(basename $(pwd))\007"
+
+    return $?
+}
+
 # bash settings
 set -o vi
 
@@ -13,4 +192,4 @@ export SVN_EDITOR=vi
 export VISUAL=vim
 export EDITOR="$VISUAL"
 
-PS1='[${debian_chroot:+($debian_chroot)}\[\033[01;34m\]\W\[\033[00m\]]\$ '
+#PS1='[${debian_chroot:+($debian_chroot)}\[\033[01;34m\]\W\[\033[00m\]]\$ '
