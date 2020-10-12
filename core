@@ -299,6 +299,10 @@ command_core() {
     esac
 }
 
+command_rn() {
+    nohup "$@" &> /dev/null &
+}
+
 print_usage() {
     cat << EOF
 
@@ -335,6 +339,7 @@ commnads)
 
     * utilities
         r [command]     : repeat command
+        rn [command]    : redirect stdout and stderr to null
 
     * alias
         cb              : clipboard
@@ -349,7 +354,7 @@ EOF
 
 }
 
-command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs"
+command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs|rn"
 
 # parse command
 fcommand="$0"
