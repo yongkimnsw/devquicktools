@@ -23,7 +23,7 @@ smart_pwd() {
 
 smart_pwd_escaped() {
     smart_pwd | sed -r 's/\(/\\(/g;s/\)/\\)/g;'
-}    
+}
 
 smart_popd() {
     for i in $(dirs -v | sort -rn -k 1 | sed -rn "s#^[[:space:]]*([1-9]+[0-9]*)[[:space:]]+$(smart_pwd_escaped)\$#\1#p"); do
@@ -33,7 +33,7 @@ smart_popd() {
 
 sed_pushd() {
     sed -rn 's#(.*)#pushd -n "\1" > /dev/null#p'
-}    
+}
 
 smart_history_update() {
     # push current directory
@@ -43,14 +43,14 @@ smart_history_update() {
     # merge memory history into stored history
     (dirs -v | sed_remove_index; cat ~/.dirstack 2> /dev/null;) | sort -ur > ~/.dirstack.$$
     mv -f ~/.dirstack.$$ ~/.dirstack
-    
+
     # load stored history
     dirs -c
     source <( cat ~/.dirstack 2> /dev/null | sed_pushd)
 }
 
 smart_history_show() {
-    
+
     echo ""
     dirs -v | sed_exclude_0_index | sed -r 's/^ ([0-9] )/\1  /g;s/^([0-9][0-9] )/\1 /g;' | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\1\2\3\4 [\2]#p;" | sort -u -k 2 |
         sed -r "s#^([[:space:]]*[0-9]+[[:space:]]+$(smart_pwd_escaped)[[:space:]]+\[[0-9]+\])\$#$text_magenta\1*$text_reset#g;"
@@ -64,7 +64,7 @@ smart_seq() {
             /^([0-9]+)-([0-9]+)$/ {
                 s/^([0-9]+)-([0-9]+)$/seq \1 \2;/p
             }
-            
+
             /^([0-9]+)$/ {
                 s/^([0-9]+)$/echo \1;/p
             }
@@ -83,112 +83,32 @@ dirsv_without_0_index() {
 
 sed_dir_only() {
     head -n 1 | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\4#p;"
-}    
+}
 
 print_parent_dirs() {
     (
         smart_pwd
         while true; do
-            if [ "$PWD" = "/" ]; then
+            if [ "x$PWD" = "x/" ]; then
                 break
             fi
-            
+
             cd .. 2> /dev/null
             smart_pwd
         done
     )
-}    
-
-smart_wcd() {
-    cdir=""
-    if [ "$#" -eq 0 ]; then
-        #smart_wcd . > /dev/null
-        smart_history_show
-        return 0
-    elif [ "$1" = "!" ]; then
-        shift
-        
-        rm -f ~/.dirstack*
-        
-        if [ "$#" -eq 0 ]; then
-            dirs -c
-        else
-            re='(^[0-9]+$|^[0-9]+-[0-9]+$)'
-            for j in "$@"; do
-
-                if [[ "$j" =~ $re ]]; then
-                    for i in $(echo "$j" | tr ' ' '\n'| smart_seq | sort -rn); do
-                        echo "delete $(dirs +$i)"
-                        popd -n "+$i" > /dev/null
-                    done
-                else
-                    for i in $(dirsv_without_0_index | egrep "$j" | sed -rn 's/^[[:space:]]*([0-9]+).*/\1/p' | sort -rn); do
-                        echo "delete $(dirs +$i)"
-                        popd -n "+$i" > /dev/null
-                    done
-                fi
-            done
-        fi
-        
-        smart_history_update
-        return 0
-        
-    elif [ -e "$1" ] && [ ! -d "$1" ]; then
-        eval /usr/bin/wcd.exec -i -q -c $(dirname "$1") || return $?
-    else
-        if [ "$1" = '=' -o "$1" = '-' -o "$1" = '+' -o "${1}" = ".." -o "${1}" = "." ]; then
-            cdir="$1"
-        elif (cd "$@") 2> /dev/null; then
-            sdir=""
-        else
-            sdir=""
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
-
-            while read i; do
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*/$*$" | sed_dir_only)
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*/$*" | sed_dir_only)
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*$*" | sed_dir_only)
-            done < <(print_parent_dirs)
-            
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "/$*$" | sed_dir_only)
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "/$*" | sed_dir_only)
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$*" | sed_dir_only)
-        fi
-        
-        sdir=${sdir/#~\//$HOME\/}
-        
-        if [ -z "$cdir" ]; then
-            /usr/bin/wcd.exec -i -q -c "${sdir:-$*}" || return $?
-        fi
-    fi
-    
-    if [ -z "$cdir" ]; then
-        grep -q "cd" ~/bin/wcd.go 2> /dev/null || return $? 
-        source ~/bin/wcd.go || return $?
-    else
-        cd "$cdir"
-    fi
-    
-    if [ -t 1 ]; then
-        smart_history_update
-        echo "$text_magenta== [cd] $(dirs -v | sed_exclude_0_index | egrep_pwd | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\1\2\3\4 [\2]#p;") ==$text_reset"
-    fi
-    
-    #echo -ne "\033]30;$(basename $(pwd))\007"
-    
-    return $?
 }
 
 find_mlocate_db() {
     (
         while [ ! -f "mlocate.db" ]; do
-            if [ "$PWD" = "/" ]; then
+            if [ "x$PWD" = "x/" ]; then
                 break
             fi
-            
+
             cd .. 2> /dev/null
         done
-        
+
         if [ -f "mlocate.db" ]; then
             echo "$PWD/mlocate.db"
         else
@@ -198,16 +118,16 @@ find_mlocate_db() {
 }
 
 xargs_md5sum() {
-    xargs -r md5sum  2> /dev/null | sort --parallel=8 | highlight_important
+    xargs -r md5sum  2> /dev/null | sort --parallel=8
 }
 
 
-highlight_important() {
-    ag --passthru "^.*/rootfs|/rootfs|$*"
+highlight() {
+    ag --passthru "$*"
 }
 
 search_mlocate_db() {
-    if [ -z "$mlocate_db" ]; then
+    if [ "x$mlocate_db" = "x" ]; then
             echo "mlocate.db not found" >&2
     else
         locate -d "$mlocate_db" "$@"
@@ -220,33 +140,9 @@ print_mlocate_info() {
     fi
 }
 
-f() {
-    mlocate_db=$(find_mlocate_db 2> /dev/null)
-
-    search_mlocate_db -r "$*" | grep "^${PWD}/" | sed -ru "s%^${PWD}/(.*)%./\1%g" | highlight_important "$*"
-    print_mlocate_info
-}
-
-t() {
-    mlocate_db=$(find_mlocate_db 2> /dev/null)
-
-    search_mlocate_db -r "$*" | highlight_important "$*"
-    print_mlocate_info
-}
-
-
-fm() {
-    mlocate_db=$(find_mlocate_db 2> /dev/null)
-
-    search_mlocate_db -r "$@" | grep "^${PWD}/" | sed -ru "s%^${PWD}/(.*)%./\1%g" | xargs_md5sum  | highlight_important "$*"
-    print_mlocate_info
-}
-
-tm() {
-    mlocate_db=$(find_mlocate_db 2> /dev/null)
-
-    search_mlocate_db -r "$@" | xargs_md5sum | highlight_important "$*"
-    print_mlocate_info
+print_sep() {
+    msg="$*"
+    printf "$text_bold%-200s$text_reset\n" "${msg:+[ $msg ]}" | sed -r 's/  /==/g;s/= /==/g;'
 }
 
 
@@ -262,29 +158,61 @@ print_mlocate_ignore() {
         "$mlocate_ignore" 2> /dev/null
 }
 
-b() {
+grep_pwd_and_remove() {
+    local dir_to_remove="$1"
+    grep "^$dir_to_remove/" | sed -ru "s%^$dir_to_remove/(.*)%./\1%g"
+}
+
+# search locate database
+command_tf() {
+
+    local pipe_command1="cat"
+    local pipe_command2="cat"
+
+    while [ $# -gt 0 ]; do
+        case $1 in
+            -f)
+                shift
+                pipe_command1="grep_pwd_and_remove ${PWD}"
+                ;;
+
+            -m)
+                shift
+                pipe_command2="xargs_md5sum"
+                ;;
+
+            *)
+                break
+                ;;
+        esac
+    done
+
+    mlocate_db=$(find_mlocate_db 2> /dev/null)
+    search_mlocate_db -r "$*" | $pipe_command1 | $pipe_command2 | highlight "^.*/rootfs|/rootfs|$*"
+}
+
+
+# build locate database
+command_b() {
     local mlocate_db
     if [ "$#" -gt 0 ]; then
         mlocate_db="$1/mlocate.db"
     else
         mlocate_db=$(find_mlocate_db)
     fi
-    
+
     test -n "$mlocate_db" || return 1
-    
+
     echo "$text_magenta== [start collecting   ] $mlocate_db ==$text_reset"
-    
+
     mlocate_dir="$(dirname "$mlocate_db")"
     mlocate_ignore="$mlocate_dir/.mlocateignore"
-    
-    if [ -n "$(print_mlocate_ignore)" ]; then
-        print_mlocate_ignore | xargs -d '\n' updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" -e && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
-    else
-        updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
-    fi
+
+    exclude_options="$(print_mlocate_ignore | sed -rn 's/^(.+)$/-e \1/p')"
+    updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" $exclude_options && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
 }
 
-p() {
+command_p() {
     local clipboard
     if [ $# -lt 1 ]; then
         clipboard=$(pwd | tr -d '\n')
@@ -294,20 +222,15 @@ p() {
         echo -n "$clipboard" | xsel --clipboard -i
     fi
     echo "$clipboard"
-}    
+}
 
 
-u() {
+command_u() {
     dirs -c
     smart_history_update
 }
 
-print_sep() {
-    msg="$*"
-    printf "$text_bold%-200s$text_reset\n" "${msg:+[ $msg ]}" | sed -r 's/  /==/g;s/= /==/g;'
-}
-
-s() {
+command_s() {
     [ "$#" = 0 ] || cd "$@"
     print_sep ""
     echo "directory : $(pwd)"
@@ -340,9 +263,93 @@ s() {
     fi
 }
 
-git-foreach() {
+command_c() {
+    cdir=""
+    if [ "$#" -eq 0 ]; then
+        #smart_wcd . > /dev/null
+        smart_history_show
+        return 0
+    elif [ "x$1" = "x!" ]; then
+        shift
+
+        rm -f ~/.dirstack*
+
+        if [ "$#" -eq 0 ]; then
+            dirs -c
+        else
+            re='(^[0-9]+$|^[0-9]+-[0-9]+$)'
+            for j in "$@"; do
+
+                if [[ "$j" =~ $re ]]; then
+                    for i in $(echo "$j" | tr ' ' '\n'| smart_seq | sort -rn); do
+                        echo "delete $(dirs +$i)"
+                        popd -n "+$i" > /dev/null
+                    done
+                else
+                    for i in $(dirsv_without_0_index | egrep "$j" | sed -rn 's/^[[:space:]]*([0-9]+).*/\1/p' | sort -rn); do
+                        echo "delete $(dirs +$i)"
+                        popd -n "+$i" > /dev/null
+                    done
+                fi
+            done
+        fi
+
+        smart_history_update
+        return 0
+
+    elif [ -e "$1" ] && [ ! -d "$1" ]; then
+        eval /usr/bin/wcd.exec -i -q -c $(dirname "$1") || return $?
+    else
+        if [ "$1" = '=' -o "$1" = '-' -o "$1" = '+' -o "${1}" = ".." -o "${1}" = "." ]; then
+            cdir="$1"
+        elif (cd "$@") 2> /dev/null; then
+            sdir=""
+        else
+            sdir=""
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
+
+            while read i; do
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*/$*$" | sed_dir_only)
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*/$*" | sed_dir_only)
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*$*" | sed_dir_only)
+            done < <(print_parent_dirs)
+
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "/$*$" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "/$*" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$*" | sed_dir_only)
+        fi
+
+        sdir=${sdir/#~\//$HOME\/}
+
+        if [ -z "$cdir" ]; then
+            /usr/bin/wcd.exec -i -q -c "${sdir:-$*}" || return $?
+        fi
+    fi
+
+    if [ -z "$cdir" ]; then
+        grep -q "cd" ~/bin/wcd.go 2> /dev/null || return $?
+        source ~/bin/wcd.go || return $?
+    else
+        cd "$cdir"
+    fi
+
+    if [ -t 1 ]; then
+        smart_history_update
+        echo "$text_magenta== [cd] $(dirs -v | sed_exclude_0_index | egrep_pwd | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\1\2\3\4 [\2]#p;") ==$text_reset"
+    fi
+
+    #echo -ne "\033]30;$(basename $(pwd))\007"
+
+    return $?
+}
+
+command_a() {
+    ag --hidden -U --ignore-dir .git --ignore-dir .svn "$@"
+}
+
+command_ge() {
     if [ "$#" -gt 0 ]; then
-        
+
         ls -d */.git 2> /dev/null | while read i; do
             echo "$text_bold========== ${i%/.git}$text_reset"
             git -C "${i%/.git}" "$@"
@@ -352,17 +359,42 @@ git-foreach() {
     fi
 }
 
+bail() {
+    echo "$*" >&1
+}
+
+command_q() {
+    local dcommand="$(dirname "$fcommand")"
+
+    case "$1" in
+        install)
+            for i in a b c ge p s u t tm f fm; do
+                ln -s "$dcommand/core" -T "$i" || bail "failed to install $i"
+            done
+            ;;
+
+        uninstall)
+            for i in a b c ge p s u t tm f fm; do
+                ofile="$(readlink -f "$i")"
+                bname="$(basename -- "$ofile")"
+
+                [ "xcore" = "x$bname" ] || bail "failed to uninstall $i"
+                rm $i
+            done
+            ;;
+
+        help|*)
+            print_usage
+            ;;
+    esac
+}
+
 # bash settings
 set -o vi
 
 # alias
 alias clipboard="xsel --clipboard"
-alias c="smart_wcd"
-alias c-="smart_wcd -"
-alias c+="smart_wcd +"
-alias c!="smart_wcd !"
-alias c~="smart_wcd ~"
-alias a="ag --hidden -U --ignore-dir .git --ignore-dir .svn"
+alias a=""
 alias mc='source /usr/lib/mc/mc-wrapper.sh --nomouse'
 alias fd='fdfind -IHp'
 
@@ -373,13 +405,80 @@ export EDITOR="$VISUAL"
 
 PS1='[${debian_chroot:+($debian_chroot)}\[\033[01;34m\]\W\[\033[00m\]]\$ '
 
-command=$(basename -- "$0")
-case "$command" in
-	t|f|b|p|u|c|a|s|git-foreach)
-		"$command" "$@"
-		;;
 
-	*)
-		smart_history_update
-		;;
+print_usage() {
+    cat << EOF
+
+devquicktools v1.0 <command> [options]
+
+commnads)
+
+    * locale database
+        b [dir]
+            build locate database
+
+        t[m] [regex] : search locate database for files and directories.
+            options)
+                m       md5sum
+                regex   regular expression to match files or directories.
+
+        f[m] [regex] : search locate database for files and directories in PWD and its children.
+            options)
+                m       md5sum
+                regex   regular expression to match files or directories.
+
+    * directories
+        p [file]    : copy the full path of file (or PWD) into clipboard
+        c [regex]   : do smart CD
+        u           : read directory history from disk.
+
+    * text search
+        a : ag
+
+    * version control utilities
+        s                   : get state of SVN or GIT
+        ge <git options>    : git for each directory
+
+    * misc
+        install     : install quick commands
+        uninstall   : uninstall quick commands
+        help        : help
+EOF
+
+}
+
+# parse command
+fcommand="$0"
+command=$(basename -- "$fcommand")
+
+# use the first argument if core is used
+if [ "x$command" = "xcore" ]; then
+    subcommand="q"
+    shift
+else
+    subcommand="$command"
+fi
+
+# parse subcommand
+case "$subcommand" in
+    t)
+        command_tf "$@"
+        ;;
+
+    tm)
+        command_tf -m "$@"
+        ;;
+
+    f)
+        command_tf -f "$@"
+        ;;
+
+    fm)
+        command_tf -f -m "$@"
+        ;;
+
+    a|b|c|ge|p|s|u|q)
+        "command_$subcommand" "$@"
+        ;;
+
 esac

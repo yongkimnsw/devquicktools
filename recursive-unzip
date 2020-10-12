@@ -29,12 +29,10 @@ while read -u 10 fname; do
                 echo "failed to untar (fname=${fname},ext=${ext})"
                 exit 0
             fi
-            
+
             rm -f "$fname"
             break
-            
+
         fi
     done
 done 10< <(ls ${extentions[@]/#/*})
-
-

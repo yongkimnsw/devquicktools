@@ -7,9 +7,8 @@ kill_children() {
 
 trap "kill_children" SIGINT
 
-while true; do 
+while true; do
     echo ""
     echo "=================================== $(date)  =================================== "
-    "$@"; 
+    "$@";
 done
-
