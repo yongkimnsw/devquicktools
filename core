@@ -333,9 +333,12 @@ commnads)
         s                   : get state of SVN or GIT
         ge <git options>    : git for each directory
 
-    * misc
+    * utilities
         r [command]     : repeat command
-        cs              : build cscope
+
+    * alias
+        cb              : clipboard
+        m               : mc with no mouse (alias)
 
     * management
         install     : install quick commands

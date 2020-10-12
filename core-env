@@ -99,7 +99,7 @@ print_parent_dirs() {
     )
 }
 
-c() {
+smart_cd() {
     cdir=""
     if [ "$#" -eq 0 ]; then
         #smart_wcd . > /dev/null
@@ -183,9 +183,9 @@ c() {
 set -o vi
 
 # alias
-alias clipboard="xsel --clipboard"
+alias cb="xsel --clipboard"
 alias m='source /usr/lib/mc/mc-wrapper.sh --nomouse'
-alias fd='fdfind -IHp'
+alias c='smart_cd'
 
 # editors
 export SVN_EDITOR=vi
