@@ -303,6 +303,12 @@ command_rn() {
     nohup "$@" &> /dev/null &
 }
 
+command_e() {
+    dest="$1"
+    dest=${dest:-.}
+    command_rn konqueror $dest
+}
+
 print_usage() {
     cat << EOF
 
@@ -340,6 +346,7 @@ commnads)
     * utilities
         r [command]     : repeat command
         rn [command]    : redirect stdout and stderr to null
+        e [directory]   : konqueror
 
     * alias
         cb              : clipboard
@@ -354,7 +361,7 @@ EOF
 
 }
 
-command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs|rn"
+command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs|rn|e"
 
 # parse command
 fcommand="$0"
