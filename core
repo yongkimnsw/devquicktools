@@ -277,9 +277,18 @@ command_core() {
     dest="${dest%/}"
 
     rcommand=$(readlink -f "$fcommand")
+    dcommand=$(dirname "$rcommand")
 
     case "$1" in
         install)
+            # install core-env
+            echo -e "installing... $dest/core-env"
+            if [ -L "$dest/core-env" ] || ! [ -e "$dest/core-env" ]; then
+                ln -sf "$dcommand/core-env" -T "$dest/core-env"
+            else
+                bail "failed to install $dest/core-env"
+            fi
+
             for i in $(echo "$command_list" | sed 's/|/ /g'); do
                 echo -e "installing... $dest/$i"
                 if [ -L "$dest/$i" ] || ! [ -e $dest/$i ]; then
@@ -288,13 +297,20 @@ command_core() {
                     bail "failed to install $dest/$i"
                 fi
             done
+
+            echo -e "adding core-env to bashrc..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-env[[:space:]]*$/d' ~/.bashrc
+            echo "source $dest/core-env" >> ~/.bashrc
             ;;
 
         uninstall)
-            for i in $(echo "$command_list" | sed 's/|/ /g'); do
+            for i in core-env $(echo "$command_list" | sed 's/|/ /g'); do
                 echo -e "uninstalling... $dest/$i"
                 ! [ -L "$dest/$i" ] || rm "$dest/$i"
             done
+
+            echo -e "removing core-env from bashrc..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-env[[:space:]]*$/d' ~/.bashrc
             ;;
 
         help|*)
