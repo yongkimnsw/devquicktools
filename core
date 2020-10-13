@@ -140,7 +140,7 @@ command_p() {
 }
 
 
-command_u() {
+command_cu() {
     dirs -c
     smart_history_update
 }
@@ -361,7 +361,7 @@ commnads)
     * directories
         p [file]    : copy the full path of file (or PWD) into clipboard
         c [regex]   : do smart CD in core-env
-        u           : read directory history from disk.
+        cu          : read directory history from disk.
 
     * external tools search
         a   : ag for all without .svn and .git
@@ -384,15 +384,15 @@ commnads)
         m               : mc with no mouse (alias)
 
     * management
-        install     : install quick commands
-        uninstall   : uninstall quick commands
-        help        : help
+        install [target directory]  : install quick commands
+        uninstall                   : uninstall quick commands
+        help                        : help
 
 EOF
 
 }
 
-command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux|at"
+command_list="core|a|b|ge|p|s|cu|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux|at"
 
 # parse command
 fcommand="$0"
