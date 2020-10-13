@@ -193,6 +193,10 @@ command_a() {
     ag --hidden -U --ignore-dir .git --ignore-dir .svn "$@"
 }
 
+command_at() {
+    grep -R --exclude-dir=.git --exclude-dir=.svn "$@" 2> /dev/null
+}
+
 command_ge() {
     if [ "$#" -gt 0 ]; then
 
@@ -344,7 +348,8 @@ commnads)
         u           : read directory history from disk.
 
     * external tools search
-        a   : ag for all with ignore .svn and .git
+        a   : ag for all without .svn and .git
+        at  : grep recurisvely with without .svn and .git
         fd  : fd for all with case ignored
 
     * version control utilities
@@ -371,7 +376,7 @@ EOF
 
 }
 
-command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux"
+command_list="core|a|b|ge|p|s|u|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux|at"
 
 # parse command
 fcommand="$0"
