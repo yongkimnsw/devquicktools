@@ -298,9 +298,9 @@ command_core() {
                 fi
             done
 
-            echo -e "adding core-env to bashrc..."
-            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-env[[:space:]]*$/d' ~/.bashrc
-            echo "source $dest/core-env" >> ~/.bashrc
+            echo -e "adding core-env to profile..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-env[[:space:]]*$/d' ~/.profile
+            echo "source $dest/core-env" >> ~/.profile
             ;;
 
         uninstall)
@@ -309,8 +309,8 @@ command_core() {
                 ! [ -L "$dest/$i" ] || rm "$dest/$i"
             done
 
-            echo -e "removing core-env from bashrc..."
-            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-env[[:space:]]*$/d' ~/.bashrc
+            echo -e "removing core-env from profile..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-env[[:space:]]*$/d' ~/.profile
             ;;
 
         help|*)
