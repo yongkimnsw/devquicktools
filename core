@@ -121,7 +121,7 @@ command_b() {
     mlocate_ignore="$mlocate_dir/.mlocateignore"
 
     exclude_options="$(print_mlocate_ignore | sed -rn 's/^(.+)$/-e \1/p')"
-    updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" "$exclude_options" && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
+    updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" ${exclude_options:+"$exclude_options"} && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
 }
 
 command_p() {
