@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# complete
+complete -cf rn
+complete -cf rq
+complete -cf e
+complete -cf sux
+
+# editors
+export SVN_EDITOR=vi
+export VISUAL=vim
+export EDITOR="$VISUAL"
+
+#PS1='[${debian_chroot:+($debian_chroot)}\[\033[01;34m\]\W\[\033[00m\]]\$ '
+
+smart_history_update

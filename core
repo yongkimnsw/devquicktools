@@ -1,12 +1,12 @@
 #!/bin/bash
 
-text_red=$(tput setaf 1)
-text_green=$(tput setaf 2)
-text_blue=$(tput setaf 4)
+#text_red=$(tput setaf 1)
+#text_green=$(tput setaf 2)
+#text_blue=$(tput setaf 4)
 text_magenta=$(tput setaf 5)
-text_yellow=$(tput setaf 3)
+#text_yellow=$(tput setaf 3)
 text_bold=$(tput bold)
-text_rev=$(tput rev)
+#text_rev=$(tput rev)
 text_reset=$(tput sgr0)
 
 find_mlocate_db() {
@@ -16,7 +16,7 @@ find_mlocate_db() {
                 break
             fi
 
-            cd .. 2> /dev/null
+            cd .. 2>/dev/null
         done
 
         if [ -f "mlocate.db" ]; then
@@ -28,9 +28,8 @@ find_mlocate_db() {
 }
 
 xargs_md5sum() {
-    xargs -r md5sum  2> /dev/null | sort --parallel=8
+    xargs -r md5sum 2>/dev/null | sort --parallel=8
 }
-
 
 highlight() {
     ag --passthru "$*"
@@ -38,7 +37,7 @@ highlight() {
 
 search_mlocate_db() {
     if [ "x$mlocate_db" = "x" ]; then
-            echo "mlocate.db not found" >&2
+        echo "mlocate.db not found" >&2
     else
         locate -d "$mlocate_db" "$@"
     fi
@@ -55,17 +54,16 @@ print_sep() {
     printf "$text_bold%-200s$text_reset\n" "${msg:+[ $msg ]}" | sed -r 's/  /==/g;s/= /==/g;'
 }
 
-
 print_mlocate_ignore() {
     sed -r \
-            "
+        "
                 s%#.*%%g;
                 /^[[:space:]]*$/d;
                 s%^([^/\\.])%$mlocate_dir\\1%g;
                 s%^\\./%$mlocate_dir/%g;
                 s%/$%%g;
             " \
-        "$mlocate_ignore" 2> /dev/null
+        "$mlocate_ignore" 2>/dev/null
 }
 
 grep_pwd_and_remove() {
@@ -102,10 +100,9 @@ command_tf() {
         esac
     done
 
-    mlocate_db=$(find_mlocate_db 2> /dev/null)
+    mlocate_db=$(find_mlocate_db 2>/dev/null)
     search_mlocate_db -r "$*" | $pipe_command1 | $pipe_command2 | highlight "^.*/rootfs|/rootfs|$*"
 }
-
 
 # build locate database
 command_b() {
@@ -124,7 +121,7 @@ command_b() {
     mlocate_ignore="$mlocate_dir/.mlocateignore"
 
     exclude_options="$(print_mlocate_ignore | sed -rn 's/^(.+)$/-e \1/p')"
-    updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" $exclude_options && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
+    updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" "$exclude_options" && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
 }
 
 command_p() {
@@ -139,16 +136,15 @@ command_p() {
     echo "$clipboard"
 }
 
-
 command_cu() {
     dirs -c
     smart_history_update
 }
 
 command_d() {
-    if svn info > /dev/null 2> /dev/null; then
+    if svn info >/dev/null 2>/dev/null; then
         svn diff
-    elif git status > /dev/null 2> /dev/null; then
+    elif git status >/dev/null 2>/dev/null; then
         git diff
     else
         echo "No source control found"
@@ -156,10 +152,10 @@ command_d() {
 }
 
 command_s() {
-    [ "$#" = 0 ] || cd "$@"
+    [ "$#" = 0 ] || cd "$@" || bail "failed to cd $*"
     print_sep ""
     echo "directory : $(pwd)"
-    if svn info > /dev/null 2> /dev/null; then
+    if svn info >/dev/null 2>/dev/null; then
         print_sep "SVN info"
         svn info
         print_sep "SVN log"
@@ -167,7 +163,7 @@ command_s() {
         print_sep "SVN status"
         svn status
         print_sep ""
-    elif git status > /dev/null 2> /dev/null; then
+    elif git status >/dev/null 2>/dev/null; then
         print_sep "GIT tag"
         git --no-pager tag -l
         print_sep "GIT branch (remote)"
@@ -188,19 +184,18 @@ command_s() {
     fi
 }
 
-
 command_a() {
     ag --hidden -U --ignore-dir .git --ignore-dir .svn "$@"
 }
 
 command_at() {
-    grep -R --exclude-dir=.git --exclude-dir=.svn "$@" 2> /dev/null
+    grep -R --exclude-dir=.git --exclude-dir=.svn "$@" 2>/dev/null
 }
 
 command_ge() {
     if [ "$#" -gt 0 ]; then
 
-        ls -d */.git 2> /dev/null | while read i; do
+        find . -maxdepth 1 -type d -name '.git' 2>/dev/null | while read -r i; do
             echo "$text_bold========== ${i%/.git}$text_reset"
             git -C "${i%/.git}" "$@"
         done
@@ -212,7 +207,6 @@ command_ge() {
 command_fd() {
     fdfind -IHp "$@"
 }
-
 
 kill_children() {
     pkill "$$"
@@ -229,7 +223,6 @@ command_r() {
         "$@"
     done
 }
-
 
 command_cs() {
     basedir="$1"
@@ -281,64 +274,79 @@ command_core() {
 
     case "$1" in
         install)
-            # install core-env
-            echo -e "installing... $dest/core-env"
-            if [ -L "$dest/core-env" ] || ! [ -e "$dest/core-env" ]; then
-                ln -sf "$dcommand/core-env" -T "$dest/core-env"
+            # install core-profile
+            echo -e "installing... $dest/core-profile"
+            if [ -L "$dest/core-profile" ] || ! [ -e "$dest/core-profile" ]; then
+                ln -sf "$dcommand/core-profile" -T "$dest/core-profile"
             else
-                bail "failed to install $dest/core-env"
+                bail "failed to install $dest/core-profile"
             fi
 
-            for i in $(echo "$command_list" | sed 's/|/ /g'); do
+            # install core-rc
+            echo -e "installing... $dest/core-rc"
+            if [ -L "$dest/core-rc" ] || ! [ -e "$dest/core-rc" ]; then
+                ln -sf "$dcommand/core-rc" -T "$dest/core-rc"
+            else
+                bail "failed to install $dest/core-rc"
+            fi
+
+            for i in ${command_list//|/ }; do
                 echo -e "installing... $dest/$i"
-                if [ -L "$dest/$i" ] || ! [ -e $dest/$i ]; then
+                if [ -L "$dest/$i" ] || ! [ -e "$dest/$i" ]; then
                     ln -sf "$rcommand" -T "$dest/$i"
                 else
                     bail "failed to install $dest/$i"
                 fi
             done
 
-            echo -e "adding core-env to profile..."
-            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-env[[:space:]]*$/d' ~/.profile
-            echo "source $dest/core-env" >> ~/.profile
+            echo -e "adding core-profile to profile..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-profile[[:space:]]*$/d' ~/.profile
+            echo "source $dest/core-profile" >>~/.profile
+
+            echo -e "adding core-profile to bashrc..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-rc[[:space:]]*$/d' ~/.bashrc
+            echo "source $dest/core-rc" >>~/.bashrc
             ;;
 
         uninstall)
-            for i in core-env $(echo "$command_list" | sed 's/|/ /g'); do
+            for i in core-profile core-rc ${command_list//|/ }; do
                 echo -e "uninstalling... $dest/$i"
                 ! [ -L "$dest/$i" ] || rm "$dest/$i"
             done
 
-            echo -e "removing core-env from profile..."
-            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-env[[:space:]]*$/d' ~/.profile
+            echo -e "removing core-profile from profile..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-profile[[:space:]]*$/d' ~/.profile
+
+            echo -e "removing core-rc from profile..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-rc[[:space:]]*$/d' ~/.bashrc
             ;;
 
-        help|*)
+        help | *)
             print_usage
             ;;
     esac
 }
 
 command_rn() {
-     XAUTHORITY=~/.Xauthority exec "$@"
+    XAUTHORITY=~/.Xauthority exec "$@"
 }
 
 command_rq() {
-    command_rn "$@" &> /dev/null
+    command_rn "$@" &>/dev/null
 }
 
 command_sux() {
-    exec sudo DISPLAY=$DISPLAY XAUTHORITY=~/.Xauthority "$@"
+    exec sudo DISPLAY="$DISPLAY" XAUTHORITY=~/.Xauthority "$@"
 }
 
 command_x() {
     dest="$1"
     dest=${dest:-.}
-    command_rn xdg-open $dest
+    command_rn xdg-open "$dest"
 }
 
 print_usage() {
-    cat << EOF
+    cat <<EOF
 
 devquicktools v1.0 <command> [options]
 
@@ -360,7 +368,7 @@ commnads)
 
     * directories
         p [file]    : copy the full path of file (or PWD) into clipboard
-        c [regex]   : do smart CD in core-env
+        c [regex]   : do smart CD in core-profile
         cu          : read directory history from disk.
 
     * external tools search

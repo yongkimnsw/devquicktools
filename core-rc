@@ -1,12 +1,12 @@
 #!/bin/bash
 
-text_red=$(tput setaf 1)
-text_green=$(tput setaf 2)
-text_blue=$(tput setaf 4)
+#text_red=$(tput setaf 1)
+#text_green=$(tput setaf 2)
+#text_blue=$(tput setaf 4)
 text_magenta=$(tput setaf 5)
-text_yellow=$(tput setaf 3)
-text_bold=$(tput bold)
-text_rev=$(tput rev)
+#text_yellow=$(tput setaf 3)
+#text_bold=$(tput bold)
+#text_rev=$(tput rev)
 text_reset=$(tput sgr0)
 
 sed_remove_index() {
@@ -27,26 +27,30 @@ smart_pwd_escaped() {
 
 smart_popd() {
     for i in $(dirs -v | sort -rn -k 1 | sed -rn "s#^[[:space:]]*([1-9]+[0-9]*)[[:space:]]+$(smart_pwd_escaped)\$#\1#p"); do
-        popd -n "+$i" > /dev/null
+        popd -n "+$i" >/dev/null
     done
 }
 
 sed_pushd() {
-    sed -rn 's#(.*)#pushd -n "\1" > /dev/null#p'
+    sed -rn 's#(.*)#pushd -n "\1" > /dev/null#p' "$@"
 }
 
 smart_history_update() {
     # push current directory
     smart_popd
-    pushd -n "$(smart_pwd)" > /dev/null
+    pushd -n "$(smart_pwd)" >/dev/null
 
     # merge memory history into stored history
-    (dirs -v | sed_remove_index; cat ~/.dirstack 2> /dev/null;) | sort -ur > ~/.dirstack.$$
+    (
+        dirs -v | sed_remove_index
+        cat ~/.dirstack 2>/dev/null
+    ) | sort -ur >~/.dirstack.$$
     mv -f ~/.dirstack.$$ ~/.dirstack
 
     # load stored history
     dirs -c
-    source <( cat ~/.dirstack 2> /dev/null | sed_pushd)
+    # shellcheck source=/dev/null
+    source <(sed_pushd ~/.dirstack 2>/dev/null)
 }
 
 smart_history_show() {
@@ -59,7 +63,7 @@ smart_history_show() {
 }
 
 smart_seq() {
-    eval $(
+    eval "$(
         sed -rn '
             /^([0-9]+)-([0-9]+)$/ {
                 s/^([0-9]+)-([0-9]+)$/seq \1 \2;/p
@@ -69,12 +73,12 @@ smart_seq() {
                 s/^([0-9]+)$/echo \1;/p
             }
         '
-    )
+    )"
 }
 
 egrep_pwd() {
     _pwd=$(smart_pwd_escaped)
-    egrep "$@" "^[[:space:]]*[0-9]+[[:space:]]+${_pwd}\$"
+    grep -E "$@" "^[[:space:]]*[0-9]+[[:space:]]+${_pwd}\$"
 }
 
 dirsv_without_0_index() {
@@ -93,7 +97,7 @@ print_parent_dirs() {
                 break
             fi
 
-            cd .. 2> /dev/null
+            cd .. 2>/dev/null
             smart_pwd
         done
     )
@@ -117,14 +121,14 @@ smart_cd() {
             for j in "$@"; do
 
                 if [[ "$j" =~ $re ]]; then
-                    for i in $(echo "$j" | tr ' ' '\n'| smart_seq | sort -rn); do
-                        echo "delete $(dirs +$i)"
-                        popd -n "+$i" > /dev/null
+                    for i in $(echo "$j" | tr ' ' '\n' | smart_seq | sort -rn); do
+                        echo "delete $(dirs "+$i")"
+                        popd -n "+$i" >/dev/null
                     done
                 else
-                    for i in $(dirsv_without_0_index | egrep "$j" | sed -rn 's/^[[:space:]]*([0-9]+).*/\1/p' | sort -rn); do
-                        echo "delete $(dirs +$i)"
-                        popd -n "+$i" > /dev/null
+                    for i in $(dirsv_without_0_index | grep -E "$j" | sed -rn 's/^[[:space:]]*([0-9]+).*/\1/p' | sort -rn); do
+                        echo "delete $(dirs "+$i")"
+                        popd -n "+$i" >/dev/null
                     done
                 fi
             done
@@ -134,25 +138,25 @@ smart_cd() {
         return 0
 
     elif [ -e "$1" ] && [ ! -d "$1" ]; then
-        eval /usr/bin/wcd.exec -i -q -c $(dirname "$1") || return $?
+        eval /usr/bin/wcd.exec -i -q -c "$(dirname "$1")" || return $?
     else
-        if [ "$1" = '=' -o "$1" = '-' -o "$1" = '+' -o "${1}" = ".." -o "${1}" = "." ]; then
+        if [ "$1" = '=' ] || [ "$1" = '-' ] || [ "$1" = '+' ] || [ "${1}" = ".." ] || [ "${1}" = "." ]; then
             cdir="$1"
-        elif (cd "$@") 2> /dev/null; then
+        elif (cd "$@") 2>/dev/null; then
             sdir=""
         else
             sdir=""
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
 
-            while read i; do
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*/$*$" | sed_dir_only)
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*/$*" | sed_dir_only)
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$i/.*$*" | sed_dir_only)
+            while read -r i; do
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*/$*$" | sed_dir_only)
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*/$*" | sed_dir_only)
+                test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*$*" | sed_dir_only)
             done < <(print_parent_dirs)
 
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "/$*$" | sed_dir_only)
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "/$*" | sed_dir_only)
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | egrep -i "$*" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "/$*$" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "/$*" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$*" | sed_dir_only)
         fi
 
         sdir=${sdir/#~\//$HOME\/}
@@ -163,10 +167,11 @@ smart_cd() {
     fi
 
     if [ -z "$cdir" ]; then
-        grep -q "cd" ~/bin/wcd.go 2> /dev/null || return $?
+        grep -q "cd" ~/bin/wcd.go 2>/dev/null || return $?
+        # shellcheck source=/dev/null
         source ~/bin/wcd.go || return $?
     else
-        cd "$cdir"
+        cd "$cdir" || bail "failed to cd to $cdir"
     fi
 
     if [ -t 1 ]; then
@@ -186,18 +191,5 @@ set -o vi
 alias cb="xsel --clipboard"
 alias m='source /usr/lib/mc/mc-wrapper.sh --nomouse'
 alias c='smart_cd'
-
-# complete
-complete -cf rn
-complete -cf rq
-complete -cf e
-complete -cf sux
-
-# editors
-export SVN_EDITOR=vi
-export VISUAL=vim
-export EDITOR="$VISUAL"
-
-#PS1='[${debian_chroot:+($debian_chroot)}\[\033[01;34m\]\W\[\033[00m\]]\$ '
 
 smart_history_update
