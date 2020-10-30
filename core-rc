@@ -5,7 +5,7 @@
 #text_blue=$(tput setaf 4)
 text_magenta=$(tput setaf 5)
 #text_yellow=$(tput setaf 3)
-#text_bold=$(tput bold)
+text_bold=$(tput bold)
 #text_rev=$(tput rev)
 text_reset=$(tput sgr0)
 
@@ -56,6 +56,10 @@ smart_history_update() {
 smart_history_show() {
 
     echo ""
+    echo "${text_bold}##### mc$text_reset"
+    dirs_from_mc | sed -r "s#^(${PWD}$)\$#$text_magenta\1*$text_reset#g;"
+    echo ""
+    echo "${text_bold}###### stack$text_reset"
     dirs -v | sed_exclude_0_index | sed -r 's/^ ([0-9] )/\1  /g;s/^([0-9][0-9] )/\1 /g;' | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\1\2\3\4 [\2]#p;" | sort -u -k 2 |
         sed -r "s#^([[:space:]]*[0-9]+[[:space:]]+$(smart_pwd_escaped)[[:space:]]+\[[0-9]+\])\$#$text_magenta\1*$text_reset#g;"
 
@@ -83,6 +87,14 @@ egrep_pwd() {
 
 dirsv_without_0_index() {
     dirs -v | sed_exclude_0_index | egrep_pwd -v
+}
+
+dirs_from_mc() {
+    sed -rn 's/.*URL "([^"]+)".*/\1/p' ~/.config/mc/hotlist | grep -v "//" | sort -u
+}
+
+dirs_from_mc_without_pwd() {
+    dirs_from_mc | grep -Ev "^${PWD}$"
 }
 
 sed_dir_only() {
@@ -146,17 +158,27 @@ smart_cd() {
             sdir=""
         else
             sdir=""
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
+            # search for index
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
+            # search for parent
+            test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*[^/]*$" | sed_dir_only)
+            test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*" | sed_dir_only)
+            # search for mc
+            test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*[^/]*$")
+            test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*")
+            # search for history
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*[^/]*$" | sed_dir_only)
+            test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*" | sed_dir_only)
 
-            while read -r i; do
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*/$*$" | sed_dir_only)
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*/$*" | sed_dir_only)
-                test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*$*" | sed_dir_only)
-            done < <(print_parent_dirs)
+            # while read -r i; do
+            #     test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*/$*$" | sed_dir_only)
+            #     test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*/$*" | sed_dir_only)
+            #     test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*$*" | sed_dir_only)
+            # done < <(print_parent_dirs)
 
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "/$*$" | sed_dir_only)
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "/$*" | sed_dir_only)
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$*" | sed_dir_only)
+            # test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "/$*$" | sed_dir_only)
+            # test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "/$*" | sed_dir_only)
+            # test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$*" | sed_dir_only)
         fi
 
         sdir=${sdir/#~\//$HOME\/}
@@ -187,7 +209,31 @@ smart_cd() {
 # bash settings
 set -o vi
 
+#######################################################################################################################
 # alias
+#######################################################################################################################
+
+# enable color support of ls and also add handy aliases
+if [ -x /usr/bin/dircolors ]; then
+    # shellcheck disable=SC2015
+    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+
+    alias ls='ls --color=auto'
+    alias dir='dir --color=auto'
+    alias vdir='vdir --color=auto'
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
+fi
+
+# some more ls aliases
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias cp='cp -i'
+alias mv='mv -i'
+alias rm='rm -i'
+
 alias cb="xsel --clipboard"
 alias m='source /usr/lib/mc/mc-wrapper.sh --nomouse'
 alias c='smart_cd'

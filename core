@@ -143,9 +143,10 @@ command_cu() {
 
 command_d() {
     if svn info >/dev/null 2>/dev/null; then
-        svn diff
+        svn diff $@
     elif git status >/dev/null 2>/dev/null; then
-        git diff
+        git diff $@
+        git diff HEAD
     else
         echo "No source control found"
     fi
