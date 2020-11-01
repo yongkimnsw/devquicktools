@@ -145,8 +145,16 @@ command_d() {
     if svn info >/dev/null 2>/dev/null; then
         svn diff $@
     elif git status >/dev/null 2>/dev/null; then
-        git diff $@
-        git diff HEAD
+        if [ "$#" -ge "0" ]; then
+            git_diff_wc=$(git diff 2>/dev/null | wc -c)
+            if [ "$git_diff_wc" = "0" ]; then
+                git diff HEAD
+            else
+                git diff
+            fi
+        else
+                git diff "$@"
+        fi
     else
         echo "No source control found"
     fi
