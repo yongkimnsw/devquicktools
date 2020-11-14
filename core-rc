@@ -169,16 +169,16 @@ smart_cd() {
     else
         sdir=""
         # search for index
-        test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
+        test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E "^[[:space:]]*$*[[:space:]]+" 2>/dev/null | sed_dir_only)
         # search for parent
-        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*[^/]*$" | sed_dir_only)
-        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*" | sed_dir_only)
+        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*[^/]*$" 2>/dev/null | sed_dir_only)
+        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*" 2>/dev/null | sed_dir_only)
         # search for mc
-        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*[^/]*$" | sed_dir_only)
-        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*" | sed_dir_only)
+        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*[^/]*$" 2>/dev/null | sed_dir_only)
+        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*" 2>/dev/null | sed_dir_only)
         # search for history
-        test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*[^/]*$" | sed_dir_only)
-        test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*" | sed_dir_only)
+        test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*[^/]*$" 2>/dev/null | sed_dir_only)
+        test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*" 2>/dev/null | sed_dir_only)
 
         if [ -n "$sdir" ]; then
             /usr/bin/wcd.exec -i -q -c "$(expand_tilde "${sdir}")" &>/dev/null || return $?
@@ -194,7 +194,10 @@ smart_cd() {
     fi
 
     if [ -e ~/bin/wcd.go ]; then
-        grep -q "cd" ~/bin/wcd.go || { echo "failed to cd to $pdir"; return 1; }
+        grep -q "cd" ~/bin/wcd.go || {
+            echo "failed to cd to $pdir"
+            return 1
+        }
         # shellcheck source=/dev/null
         source ~/bin/wcd.go || return $?
     fi
