@@ -187,7 +187,7 @@ smart_cd() {
             grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "*$pdir" &>/dev/null
             # print error
             grep -q "cd" ~/bin/wcd.go 2>/dev/null || {
-                /usr/bin/wcd.exec -i -q -c "*$pdir" &>/dev/null
+                /usr/bin/wcd.exec -i -q -c "$pdir"
                 return 1
             }
         fi
@@ -195,7 +195,7 @@ smart_cd() {
 
     if [ -e ~/bin/wcd.go ]; then
         grep -q "cd" ~/bin/wcd.go || {
-            echo "failed to cd to $pdir"
+            echo "failed to cd to $pdir" >&2
             return 1
         }
         # shellcheck source=/dev/null
