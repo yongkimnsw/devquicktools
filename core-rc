@@ -164,25 +164,28 @@ smart_cd() {
     # switch to dirname of file
     elif [ -e "$pdir" ] && [ ! -d "$pdir" ]; then
         /usr/bin/wcd.exec -i -q -c "$(dirname "$pdir")" || return $?
-    elif [ "x$pdir" = 'x=' ] || [ "x$pdir" = 'x-' ] || [ "x$pdir" = 'x+' ] || [ "x$pdir" = "x.." ] || [ "x$pdir" = "x." ] || (cd "$@" &>/dev/null); then
+    elif [ "x$pdir" = 'x=' ] || [ "x$pdir" = 'x-' ] || [ "x$pdir" = 'x+' ] || [ "x$pdir" = "x.." ] || [ "x$pdir" = "x." ]; then
         /usr/bin/wcd.exec -i -q -c "${pdir}" &>/dev/null || return $?
+    elif (cd "${pdir}" &>/dev/null); then
+        cd "${pdir}" &>/dev/null || return $?
     else
         sdir=""
         # search for index
         test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E "^[[:space:]]*$*[[:space:]]+" 2>/dev/null | sed_dir_only)
         # search for parent
-        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*[^/]*$" 2>/dev/null | sed_dir_only)
-        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*" 2>/dev/null | sed_dir_only)
+        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*[^/]*$" 2>/dev/null | head -n 1)
+        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*" 2>/dev/null | head -n 1)
         # search for mc
-        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*[^/]*$" 2>/dev/null | sed_dir_only)
-        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*" 2>/dev/null | sed_dir_only)
+        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*[^/]*$" 2>/dev/null | head -n 1)
+        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*" 2>/dev/null | head -n 1)
         # search for history
         test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*[^/]*$" 2>/dev/null | sed_dir_only)
         test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*" 2>/dev/null | sed_dir_only)
 
-        if [ -n "$sdir" ]; then
-            /usr/bin/wcd.exec -i -q -c "$(expand_tilde "${sdir}")" &>/dev/null || return $?
+        if [ -n "$sdir" ] && (cd "$(expand_tilde "${sdir}")"); then
+            cd "$(expand_tilde "${sdir}")" &>/dev/null || return $?
         else
+            grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "$pdir" &>/dev/null
             grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "$pdir*" &>/dev/null
             grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "*$pdir" &>/dev/null
             # print error
