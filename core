@@ -51,7 +51,8 @@ print_mlocate_info() {
 
 print_sep() {
     msg="$*"
-    printf "$text_bold%-200s$text_reset\n" "${msg:+[ $msg ]}" | sed -r 's/  /==/g;s/= /==/g;'
+    echo ""
+    printf "$text_bold%-100s$text_reset\n" "${msg:+[ $msg ]}" | sed -r 's/  /==/g;s/= /==/g;'
 }
 
 print_mlocate_ignore() {
@@ -122,6 +123,8 @@ command_b() {
 
     exclude_options="$(print_mlocate_ignore | sed -rn 's/^(.+)$/-e \1/p')"
     updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" ${exclude_options:+"$exclude_options"} && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
+
+    wcd.exec -S "$mlocate_dir"
 }
 
 command_p() {
@@ -143,7 +146,7 @@ command_cu() {
 
 command_d() {
     if svn info >/dev/null 2>/dev/null; then
-        svn diff $@
+        svn diff "$@"
     elif git status >/dev/null 2>/dev/null; then
         if [ "$#" -ge "0" ]; then
             git_diff_wc=$(git diff 2>/dev/null | wc -c)
@@ -153,16 +156,45 @@ command_d() {
                 git diff
             fi
         else
-                git diff "$@"
+            git diff "$@"
         fi
     else
         echo "No source control found"
     fi
 }
 
+command_v() {
+    [ "$#" = 0 ] || cd "$@" || bail "failed to cd $*"
+    print_sep "directory"
+    echo "directory : $(pwd)"
+    if svn info >/dev/null 2>/dev/null; then
+        print_sep "SVN info"
+        svn info
+        print_sep "SVN log"
+        svn log -l 3
+        print_sep "SVN status"
+        svn status
+        print_sep ""
+    elif git status >/dev/null 2>/dev/null; then
+        print_sep "GIT remote"
+        git --no-pager remote -v
+        print_sep "GIT log"
+        git --no-pager log -n 3
+        print_sep "GIT branch (local)"
+        git --no-pager branch -v
+        print_sep "GIT status"
+        git --no-pager status
+        print_sep ""
+    else
+        print_sep ""
+        echo "No source control found"
+        print_sep ""
+    fi
+}
+
 command_s() {
     [ "$#" = 0 ] || cd "$@" || bail "failed to cd $*"
-    print_sep ""
+    print_sep "directory"
     echo "directory : $(pwd)"
     if svn info >/dev/null 2>/dev/null; then
         print_sep "SVN info"
@@ -378,6 +410,8 @@ commnads)
     * directories
         p [file]    : copy the full path of file (or PWD) into clipboard
         c [regex]   : do smart CD in core-profile
+        c!          : clean history
+        c..         : change directory to parent
         cu          : read directory history from disk.
 
     * external tools search
@@ -388,6 +422,7 @@ commnads)
     * version control utilities
         s                   : get state of SVN or GIT
         ge <git options>    : git for each directory
+        v                   : get SVN or GIT branch
 
     * utilities
         r [command]              : repeat command
@@ -395,6 +430,7 @@ commnads)
         rq [command]             : do rn with stdout and stderr redirected to null
         x <command or directory> : xdg-open by rn
         sux <command>            : sudo with xauthority
+        cs                       : build cscope
 
     * alias
         cb              : clipboard
@@ -409,7 +445,7 @@ EOF
 
 }
 
-command_list="core|a|b|ge|p|s|cu|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux|at"
+command_list="core|a|b|ge|p|s|cu|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux|at|v"
 
 # parse command
 fcommand="$0"

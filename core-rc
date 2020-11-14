@@ -25,6 +25,11 @@ smart_pwd_escaped() {
     smart_pwd | sed -r 's/\(/\\(/g;s/\)/\\)/g;'
 }
 
+expand_tilde() {
+    local var="$1"
+    echo "${var/#\~/$HOME}"
+}
+
 smart_popd() {
     for i in $(dirs -v | sort -rn -k 1 | sed -rn "s#^[[:space:]]*([1-9]+[0-9]*)[[:space:]]+$(smart_pwd_escaped)\$#\1#p"); do
         popd -n "+$i" >/dev/null
@@ -116,12 +121,19 @@ print_parent_dirs() {
 }
 
 smart_cd() {
-    cdir=""
+    # directory in parameter
+    local pdir="$(expand_tilde "$1")"
+    local sdir
+
+    rm -f ~/bin/wcd.go
+
+    # show history
     if [ "$#" -eq 0 ]; then
-        #smart_wcd . > /dev/null
         smart_history_show
         return 0
-    elif [ "x$1" = "x!" ]; then
+
+    # delete items in history
+    elif [ "x$pdir" = "x!" ]; then
         shift
 
         rm -f ~/.dirstack*
@@ -149,59 +161,48 @@ smart_cd() {
         smart_history_update
         return 0
 
-    elif [ -e "$1" ] && [ ! -d "$1" ]; then
-        eval /usr/bin/wcd.exec -i -q -c "$(dirname "$1")" || return $?
+    # switch to dirname of file
+    elif [ -e "$pdir" ] && [ ! -d "$pdir" ]; then
+        /usr/bin/wcd.exec -i -q -c "$(dirname "$pdir")" || return $?
+    elif [ "x$pdir" = 'x=' ] || [ "x$pdir" = 'x-' ] || [ "x$pdir" = 'x+' ] || [ "x$pdir" = "x.." ] || [ "x$pdir" = "x." ] || (cd "$@" &>/dev/null); then
+        /usr/bin/wcd.exec -i -q -c "${pdir}" &>/dev/null || return $?
     else
-        if [ "$1" = '=' ] || [ "$1" = '-' ] || [ "$1" = '+' ] || [ "${1}" = ".." ] || [ "${1}" = "." ]; then
-            cdir="$1"
-        elif (cd "$@") 2>/dev/null; then
-            sdir=""
+        sdir=""
+        # search for index
+        test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
+        # search for parent
+        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*[^/]*$" | sed_dir_only)
+        test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*" | sed_dir_only)
+        # search for mc
+        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*[^/]*$" | sed_dir_only)
+        test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*" | sed_dir_only)
+        # search for history
+        test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*[^/]*$" | sed_dir_only)
+        test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*" | sed_dir_only)
+
+        if [ -n "$sdir" ]; then
+            /usr/bin/wcd.exec -i -q -c "$(expand_tilde "${sdir}")" &>/dev/null || return $?
         else
-            sdir=""
-            # search for index
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E "^[[:space:]]*$*[[:space:]]+" | sed_dir_only)
-            # search for parent
-            test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*[^/]*$" | sed_dir_only)
-            test -n "$sdir" || sdir=$(print_parent_dirs | sort | agrep -B -i "$*" | sed_dir_only)
-            # search for mc
-            test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*[^/]*$")
-            test -n "$sdir" || sdir=$(dirs_from_mc_without_pwd | sort | agrep -B -i "$*")
-            # search for history
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*[^/]*$" | sed_dir_only)
-            test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*" | sed_dir_only)
-
-            # while read -r i; do
-            #     test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*/$*$" | sed_dir_only)
-            #     test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*/$*" | sed_dir_only)
-            #     test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$i/.*$*" | sed_dir_only)
-            # done < <(print_parent_dirs)
-
-            # test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "/$*$" | sed_dir_only)
-            # test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "/$*" | sed_dir_only)
-            # test -n "$sdir" || sdir=$(dirsv_without_0_index | grep -E -i "$*" | sed_dir_only)
-        fi
-
-        sdir=${sdir/#~\//$HOME\/}
-
-        if [ -z "$cdir" ]; then
-            /usr/bin/wcd.exec -i -q -c "${sdir:-$*}" || return $?
+            grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "$pdir*" &>/dev/null
+            grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "*$pdir" &>/dev/null
+            # print error
+            grep -q "cd" ~/bin/wcd.go 2>/dev/null || {
+                /usr/bin/wcd.exec -i -q -c "*$pdir" &>/dev/null
+                return 1
+            }
         fi
     fi
 
-    if [ -z "$cdir" ]; then
-        grep -q "cd" ~/bin/wcd.go 2>/dev/null || return $?
+    if [ -e ~/bin/wcd.go ]; then
+        grep -q "cd" ~/bin/wcd.go || { echo "failed to cd to $pdir"; return 1; }
         # shellcheck source=/dev/null
         source ~/bin/wcd.go || return $?
-    else
-        cd "$cdir" || bail "failed to cd to $cdir"
     fi
 
     if [ -t 1 ]; then
         smart_history_update
         echo "$text_magenta== [cd] $(dirs -v | sed_exclude_0_index | egrep_pwd | sed -rn "s#^([[:space:]]*)([1-9]+[0-9]*)([[:space:]]+)(.*)\$#\1\2\3\4 [\2]#p;") ==$text_reset"
     fi
-
-    #echo -ne "\033]30;$(basename $(pwd))\007"
 
     return $?
 }
@@ -220,5 +221,7 @@ alias rm='rm -i'
 alias cb="xsel --clipboard"
 alias m='source /usr/lib/mc/mc-wrapper.sh --nomouse'
 alias c='smart_cd'
+alias c!='smart_cd !'
+alias c..='smart_cd ..'
 
 smart_history_update
