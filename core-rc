@@ -164,8 +164,8 @@ smart_cd() {
     # switch to dirname of file
     elif [ -e "$pdir" ] && [ ! -d "$pdir" ]; then
         /usr/bin/wcd.exec -i -q -c "$(dirname "$pdir")" || return $?
-    elif [ "x$pdir" = 'x=' ] || [ "x$pdir" = 'x-' ] || [ "x$pdir" = 'x+' ] || [ "x$pdir" = "x.." ] || [ "x$pdir" = "x." ]; then
-        /usr/bin/wcd.exec -i -q -c "${pdir}" &>/dev/null || return $?
+    elif [ "x$pdir" = 'x-' ] || [ "x$pdir" = "x.." ] || [ "x$pdir" = "x." ]; then
+        cd "${pdir}" || return $?
     elif (cd "${pdir}" &>/dev/null); then
         cd "${pdir}" &>/dev/null || return $?
     else
@@ -182,12 +182,12 @@ smart_cd() {
         test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*[^/]*$" 2>/dev/null | sed_dir_only)
         test -n "$sdir" || sdir=$(dirsv_without_0_index | agrep -B -i "$*" 2>/dev/null | sed_dir_only)
 
-        if [ -n "$sdir" ] && (cd "$(expand_tilde "${sdir}")"); then
-            cd "$(expand_tilde "${sdir}")" &>/dev/null || return $?
+        if [ -n "$sdir" ]; then
+            cd "$(expand_tilde "${sdir}")" || return $?
         else
-            grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "$pdir" &>/dev/null
-            grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "$pdir*" &>/dev/null
-            grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "*$pdir" &>/dev/null
+            /usr/bin/wcd.exec -i -q -c "$pdir"
+            grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "$pdir*"
+            grep -q "cd" ~/bin/wcd.go 2>/dev/null || /usr/bin/wcd.exec -i -q -c "*$pdir"
             # print error
             grep -q "cd" ~/bin/wcd.go 2>/dev/null || {
                 /usr/bin/wcd.exec -i -q -c "$pdir"
@@ -229,5 +229,7 @@ alias m='source /usr/lib/mc/mc-wrapper.sh --nomouse'
 alias c='smart_cd'
 alias c!='smart_cd !'
 alias c..='smart_cd ..'
+alias c-='smart_cd -'
+alias c+='smart_cd +'
 
 smart_history_update
