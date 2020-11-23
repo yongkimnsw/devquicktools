@@ -246,7 +246,7 @@ command_ge() {
 }
 
 command_fd() {
-    fdfind -IHp "$@"
+    /bin/fd -IHp "$@"
 }
 
 kill_children() {
