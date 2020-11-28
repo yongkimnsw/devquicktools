@@ -123,8 +123,6 @@ command_b() {
 
     exclude_options="$(print_mlocate_ignore | sed -rn 's/^(.+)$/-e \1/p')"
     updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" ${exclude_options:+"$exclude_options"} && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
-
-    wcd.exec -S "$mlocate_dir"
 }
 
 command_p() {
@@ -137,11 +135,6 @@ command_p() {
         echo -n "$clipboard" | xsel --clipboard -i
     fi
     echo "$clipboard"
-}
-
-command_cu() {
-    dirs -c
-    smart_history_update
 }
 
 command_d() {
@@ -340,13 +333,14 @@ command_core() {
                 fi
             done
 
-            echo -e "adding core-profile to profile..."
-            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-profile[[:space:]]*$/d' ~/.profile
-            echo "source $dest/core-profile" >>~/.profile
+            echo -e "adding core-profile to zprofile..."
+            touch ~/.zprofile
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-profile[[:space:]]*$/d' ~/.zprofile
+            echo "source $dest/core-profile" >>~/.zprofile
 
-            echo -e "adding core-profile to bashrc..."
-            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-rc[[:space:]]*$/d' ~/.bashrc
-            echo "source $dest/core-rc" >>~/.bashrc
+            echo -e "adding core-rc to zshrc..."
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-rc[[:space:]]*$/d' ~/.zshrc
+            echo "source $dest/core-rc" >>~/.zshrc
             ;;
 
         uninstall)
@@ -355,11 +349,12 @@ command_core() {
                 ! [ -L "$dest/$i" ] || rm "$dest/$i"
             done
 
-            echo -e "removing core-profile from profile..."
-            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-profile[[:space:]]*$/d' ~/.profile
+            echo -e "removing core-profile from zprofile..."
+            touch ~/.zprofile
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-profile[[:space:]]*$/d' ~/.zprofile
 
             echo -e "removing core-rc from profile..."
-            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-rc[[:space:]]*$/d' ~/.bashrc
+            sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-rc[[:space:]]*$/d' ~/.zshrc
             ;;
 
         help | *)
@@ -409,10 +404,6 @@ commnads)
 
     * directories
         p [file]    : copy the full path of file (or PWD) into clipboard
-        c [regex]   : do smart CD in core-profile
-        c!          : clean history
-        c..         : change directory to parent
-        cu          : read directory history from disk.
 
     * external tools search
         a   : ag for all without .svn and .git
@@ -445,7 +436,7 @@ EOF
 
 }
 
-command_list="core|a|b|ge|p|s|cu|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux|at|v"
+command_list="core|a|b|ge|p|s|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux|at|v"
 
 # parse command
 fcommand="$0"
