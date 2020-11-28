@@ -334,7 +334,7 @@ command_core() {
             done
 
             echo -e "adding core-profile to zprofile..."
-            touch ~/.zprofile
+            touch ~/.zprofile ~/.zshrc
             sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-profile[[:space:]]*$/d' ~/.zprofile
             echo "source $dest/core-profile" >>~/.zprofile
 
@@ -350,7 +350,7 @@ command_core() {
             done
 
             echo -e "removing core-profile from zprofile..."
-            touch ~/.zprofile
+            touch ~/.zprofile ~/.zshrc
             sed -ri '/^[[:space:]]*source[[:space:]]+.*\/core-profile[[:space:]]*$/d' ~/.zprofile
 
             echo -e "removing core-rc from profile..."
