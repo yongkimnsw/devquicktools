@@ -78,7 +78,7 @@ bail() {
 }
 
 # search locate database
-command_qtf() {
+command_qfind() {
 
     local pipe_command1="cat"
     local pipe_command2="cat"
@@ -334,12 +334,12 @@ commnads)
         qbuildloc [dir]
             build locate database
 
-        qgsearch[m] <regex> : search locate database for global files and directories
+        qfind[m] <regex> : search locate database for global files and directories
             options)
                 m       md5sum
                 regex   regular expression to match files or directories
 
-        qlsearch[m] <regex> : search locate database for local files and directories
+        qlfind[m] <regex> : search locate database for local files and directories
             options)
                 m       md5sum
                 regex   regular expression to match files or directories
@@ -377,7 +377,7 @@ EOF
 
 }
 
-command_list="core|sux|qrun|qag|qgrep|qstatus|qbuildloc|qgiteach|qpath|qgsearch|qtm|qlsearch|qlsearchm|qfd|qbcscope|qrep"
+command_list="core|sux|qrun|qag|qgrep|qstatus|qbuildloc|qgiteach|qpath|qfind|qfindm|qtm|qlfind|qlfindm|qfd|qbcscope|qrep"
 
 # parse command
 fcommand="$0"
@@ -385,20 +385,20 @@ subcommand=$(basename -- "$fcommand")
 
 # parse subcommand
 case "$subcommand" in
-    qt)
-        command_qtf "$@"
+    qfind)
+        command_qfind "$@"
         ;;
 
-    qtm)
-        command_qtf -m "$@"
+    qfindm)
+        command_qfind -m "$@"
         ;;
 
-    qlsearch)
-        command_qtf -f "$@"
+    qlfind)
+        command_qfind -f "$@"
         ;;
 
-    qlsearchm)
-        command_qtf -f -m "$@"
+    qlfindm)
+        command_qfind -f -m "$@"
         ;;
 
     *)
