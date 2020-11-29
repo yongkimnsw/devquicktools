@@ -78,7 +78,7 @@ bail() {
 }
 
 # search locate database
-command_tf() {
+command_qtf() {
 
     local pipe_command1="cat"
     local pipe_command2="cat"
@@ -106,7 +106,7 @@ command_tf() {
 }
 
 # build locate database
-command_b() {
+command_qb() {
     local mlocate_db
     if [ "$#" -gt 0 ]; then
         mlocate_db="$1/mlocate.db"
@@ -125,7 +125,7 @@ command_b() {
     updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" ${exclude_options:+"$exclude_options"} && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
 }
 
-command_p() {
+command_qp() {
     local clipboard
     if [ $# -lt 1 ]; then
         clipboard=$(pwd | tr -d '\n')
@@ -137,7 +137,7 @@ command_p() {
     echo "$clipboard"
 }
 
-command_s() {
+command_qs() {
     [ "$#" = 0 ] || cd "$@" || bail "failed to cd $*"
     print_sep "directory"
     echo "directory : $(pwd)"
@@ -170,15 +170,15 @@ command_s() {
     fi
 }
 
-command_a() {
+command_qa() {
     ag --hidden -U --ignore-dir .git --ignore-dir .svn "$@"
 }
 
-command_at() {
+command_qat() {
     grep -R --exclude-dir=.git --exclude-dir=.svn "$@" 2>/dev/null
 }
 
-command_ge() {
+command_qge() {
     if [ "$#" -gt 0 ]; then
 
         find . -maxdepth 1 -type d -name '.git' 2>/dev/null | while read -r i; do
@@ -190,7 +190,7 @@ command_ge() {
     fi
 }
 
-command_fd() {
+command_qfd() {
     /bin/fd -IHp "$@"
 }
 
@@ -199,7 +199,7 @@ kill_children() {
     exit 0
 }
 
-command_r() {
+command_qr() {
 
     trap "kill_children" SIGINT
 
@@ -210,7 +210,7 @@ command_r() {
     done
 }
 
-command_cs() {
+command_qcs() {
     basedir="$1"
     test -z "$basedir" && basedir=$(pwd)
 
@@ -315,22 +315,22 @@ command_core() {
     esac
 }
 
-command_rn() {
+command_qrn() {
     XAUTHORITY=~/.Xauthority exec "$@"
 }
 
-command_rq() {
-    command_rn "$@" &>/dev/null
+command_qrq() {
+    command_qrn "$@" &>/dev/null
 }
 
-command_sux() {
+command_qsux() {
     exec sudo DISPLAY="$DISPLAY" XAUTHORITY=~/.Xauthority "$@"
 }
 
-command_x() {
+command_qx() {
     dest="$1"
     dest=${dest:-.}
-    command_rn xdg-open "$dest"
+    command_qrn xdg-open "$dest"
 }
 
 print_usage() {
@@ -341,42 +341,42 @@ devquicktools v1.0 <command> [options]
 commnads)
 
     * locale database
-        b [dir]
+        qb [dir]
             build locate database
 
-        t[m] [regex] : search locate database for files and directories.
+        qt[m] [regex] : search locate database for files and directories.
             options)
                 m       md5sum
                 regex   regular expression to match files or directories.
 
-        f[m] [regex] : search locate database for files and directories in PWD and its children.
+        qf[m] [regex] : search locate database for files and directories in PWD and its children.
             options)
                 m       md5sum
                 regex   regular expression to match files or directories.
 
     * clipboard
-        p [file] : copy the full path of file (or PWD) into clipboard
-        cb       : copy stdinout to clipboard
+        qp [file] : copy the full path of file (or PWD) into clipboard
+        qcb       : copy stdinout to clipboard
 
     * grep and find
-        a  : ag for all without .svn and .git
-        at : grep recurisvely with without .svn and .git
-        fd : fd for all with case ignored
+        qa  : ag for all without .svn and .git
+        qat : grep recurisvely with without .svn and .git
+        qfd : fd for all with case ignored
 
     * version control
-        s                : get state of SVN or GIT
-        ge <git command> : git for each directory
+        qs                : get state of SVN or GIT
+        qge <git command> : git for each directory
 
     * launch
-        r   : repeat command
-        rn  : run with xauthroity
-        rq  : do rn with stdout and stderr redirected to null
-        x   : xdg-open by rn
-        sux : sudo with xauthority
+        qr   : repeat command
+        qrn  : run with xauthroity
+        qrq  : do rn with stdout and stderr redirected to null
+        qx   : xdg-open by rn
+        qsux : sudo with xauthority
 
     * misc.
-        cs : build cscope
-        m  : mc with no mouse (alias)
+        qcs : build cscope
+        qm  : mc with no mouse (alias)
 
     * management
         install [target directory] : install quick commands
@@ -387,7 +387,7 @@ EOF
 
 }
 
-command_list="core|a|b|ge|p|s|t|tm|f|fm|fd|r|cs|rn|rq|x|sux|at"
+command_list="core|qa|qb|qge|qp|qs|qt|qtm|qf|qfm|qfd|qr|qcs|qrn|qrq|qx|qsux|qat"
 
 # parse command
 fcommand="$0"
@@ -395,20 +395,20 @@ subcommand=$(basename -- "$fcommand")
 
 # parse subcommand
 case "$subcommand" in
-    t)
-        command_tf "$@"
+    qt)
+        command_qtf "$@"
         ;;
 
-    tm)
-        command_tf -m "$@"
+    qtm)
+        command_qtf -m "$@"
         ;;
 
-    f)
-        command_tf -f "$@"
+    qf)
+        command_qtf -f "$@"
         ;;
 
-    fm)
-        command_tf -f -m "$@"
+    qfm)
+        command_qtf -f -m "$@"
         ;;
 
     *)

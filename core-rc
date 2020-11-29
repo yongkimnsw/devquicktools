@@ -25,12 +25,24 @@ antigen bundle zsh-users/zsh-completions
 antigen bundle supercrabtree/k
 antigen bundle le0me55i/zsh-extract
 antigen bundle MichaelAquilina/zsh-auto-notify
+antigen bundle b4b4r07/enhancd
+antigen bundle rupa/z
+antigen bundle clvv/fasd
 
 # Load the theme.
 antigen theme robbyrussell
 
 # Tell Antigen that you're done.
 antigen apply
+
+#######################################################################################################################
+# initiate fasd
+#######################################################################################################################
+
+eval "$(fasd --init auto)"
+
+alias v='f -e vim' # quick opening files with vim
+alias o='a -e xdg-open' # quick opening files with xdg-open
 
 #######################################################################################################################
 # start rc
@@ -40,10 +52,10 @@ autoload -Uz compinit && compinit
 autoload -U +X bashcompinit && bashcompinit
 
 # complete
-complete -cf rn
-complete -cf rq
-complete -cf e
-complete -cf sux
+complete -cf qrn
+complete -cf qrq
+complete -cf qe
+complete -cf qsux
 
 set -o vi
 
@@ -51,5 +63,5 @@ alias cp='cp -i'
 alias mv='mv -i'
 alias rm='rm -i'
 
-alias cb="xsel --clipboard"
-alias m='source /usr/lib/mc/mc-wrapper.sh --nomouse'
+alias qcb="xsel --clipboard"
+alias qm='source /usr/lib/mc/mc-wrapper.sh --nomouse'
