@@ -43,7 +43,7 @@ eval "$(fasd --init auto)"
 
 alias v='f -e vim' # quick opening files with vim
 alias o='a -e xdg-open' # quick opening files with xdg-open
-alias p='a -e qp'
+alias p='a -e qpath'
 
 #######################################################################################################################
 # start rc
@@ -53,9 +53,7 @@ autoload -Uz compinit && compinit
 autoload -U +X bashcompinit && bashcompinit
 
 # complete
-complete -cf qrn
-complete -cf qrq
-complete -cf qe
+complete -cf qrun
 complete -cf qsux
 
 set -o vi
@@ -64,5 +62,5 @@ alias cp='cp -i'
 alias mv='mv -i'
 alias rm='rm -i'
 
-alias qcb="xsel --clipboard"
-alias qm='source /usr/lib/mc/mc-wrapper.sh --nomouse'
+alias qxsel="xsel --clipboard"
+alias qmc='source /usr/lib/mc/mc-wrapper.sh --nomouse'

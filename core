@@ -106,7 +106,7 @@ command_qtf() {
 }
 
 # build locate database
-command_qb() {
+command_qbuildloc() {
     local mlocate_db
     if [ "$#" -gt 0 ]; then
         mlocate_db="$1/mlocate.db"
@@ -125,7 +125,7 @@ command_qb() {
     updatedb -l 0 -o "$mlocate_db" -U "$mlocate_dir" ${exclude_options:+"$exclude_options"} && echo "$text_magenta== [finished collecting] $mlocate_db ==$text_reset" >&2
 }
 
-command_qp() {
+command_qpath() {
     local clipboard
     if [ $# -lt 1 ]; then
         clipboard=$(pwd | tr -d '\n')
@@ -137,7 +137,7 @@ command_qp() {
     echo "$clipboard"
 }
 
-command_qs() {
+command_qstatus() {
     [ "$#" = 0 ] || cd "$@" || bail "failed to cd $*"
     print_sep "directory"
     echo "directory : $(pwd)"
@@ -170,15 +170,15 @@ command_qs() {
     fi
 }
 
-command_qa() {
+command_qag() {
     ag --hidden -U --ignore-dir .git --ignore-dir .svn "$@"
 }
 
-command_qat() {
+command_qgrep() {
     grep -R --exclude-dir=.git --exclude-dir=.svn "$@" 2>/dev/null
 }
 
-command_qge() {
+command_qgiteach() {
     if [ "$#" -gt 0 ]; then
 
         find . -maxdepth 1 -type d -name '.git' 2>/dev/null | while read -r i; do
@@ -199,7 +199,7 @@ kill_children() {
     exit 0
 }
 
-command_qr() {
+command_qrep() {
 
     trap "kill_children" SIGINT
 
@@ -210,7 +210,7 @@ command_qr() {
     done
 }
 
-command_qcs() {
+command_qbcscope() {
     basedir="$1"
     test -z "$basedir" && basedir=$(pwd)
 
@@ -315,22 +315,12 @@ command_core() {
     esac
 }
 
-command_qrn() {
-    XAUTHORITY=~/.Xauthority exec "$@"
-}
-
-command_qrq() {
-    command_qrn "$@" &>/dev/null
+command_qrun() {
+    DISPLAY="$DISPLAY" XAUTHORITY=~/.Xauthority exec "$@" &>/dev/null
 }
 
 command_qsux() {
     exec sudo DISPLAY="$DISPLAY" XAUTHORITY=~/.Xauthority "$@"
-}
-
-command_qx() {
-    dest="$1"
-    dest=${dest:-.}
-    command_qrn xdg-open "$dest"
 }
 
 print_usage() {
@@ -341,53 +331,53 @@ devquicktools v1.0 <command> [options]
 commnads)
 
     * locale database
-        qb [dir]
+        qbuildloc [dir]
             build locate database
 
-        qt[m] [regex] : search locate database for files and directories.
+        qgsearch[m] <regex> : search locate database for global files and directories
             options)
                 m       md5sum
-                regex   regular expression to match files or directories.
+                regex   regular expression to match files or directories
 
-        qf[m] [regex] : search locate database for files and directories in PWD and its children.
+        qlsearch[m] <regex> : search locate database for local files and directories
             options)
                 m       md5sum
-                regex   regular expression to match files or directories.
+                regex   regular expression to match files or directories
 
-    * clipboard
-        qp [file] : copy the full path of file (or PWD) into clipboard
-        qcb       : copy stdinout to clipboard
+    * path
+        qpath [file] : copy the full path of file (or PWD) into clipboard
 
     * grep and find
-        qa  : ag for all without .svn and .git
-        qat : grep recurisvely with without .svn and .git
-        qfd : fd for all with case ignored
+        qag   : ag without .svn and .git
+        qgrep : grep recurisvely without .svn and .git
+        qfd   : fd for all with case ignored
 
     * version control
-        qs                : get state of SVN or GIT
-        qge <git command> : git for each directory
+        qstatus                : get state of SVN or GIT
+        qgiteach <git command> : git for each directory
 
     * launch
-        qr   : repeat command
-        qrn  : run with xauthroity
-        qrq  : do rn with stdout and stderr redirected to null
-        qx   : xdg-open by rn
+        qrep : repeat command
+        qrun : do rn with stdout and stderr redirected to null
         qsux : sudo with xauthority
 
     * misc.
-        qcs : build cscope
-        qm  : mc with no mouse (alias)
+        qbcscope : build cscope
 
     * management
         install [target directory] : install quick commands
         uninstall                  : uninstall quick commands
         help                       : print usage help
 
+    * alias
+        qmc   : launch mc with no mouse (alias)
+        qxsel : copy stdin to clipboard
+
 EOF
 
 }
 
-command_list="core|qa|qb|qge|qp|qs|qt|qtm|qf|qfm|qfd|qr|qcs|qrn|qrq|qx|qsux|qat"
+command_list="core|sux|qrun|qag|qgrep|qstatus|qbuildloc|qgiteach|qpath|qgsearch|qtm|qlsearch|qlsearchm|qfd|qbcscope|qrep"
 
 # parse command
 fcommand="$0"
@@ -403,11 +393,11 @@ case "$subcommand" in
         command_qtf -m "$@"
         ;;
 
-    qf)
+    qlsearch)
         command_qtf -f "$@"
         ;;
 
-    qfm)
+    qlsearchm)
         command_qtf -f -m "$@"
         ;;
 
