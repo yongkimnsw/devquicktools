@@ -137,54 +137,6 @@ command_p() {
     echo "$clipboard"
 }
 
-command_d() {
-    if svn info >/dev/null 2>/dev/null; then
-        svn diff "$@"
-    elif git status >/dev/null 2>/dev/null; then
-        if [ "$#" -ge "0" ]; then
-            git_diff_wc=$(git diff 2>/dev/null | wc -c)
-            if [ "$git_diff_wc" = "0" ]; then
-                git diff HEAD
-            else
-                git diff
-            fi
-        else
-            git diff "$@"
-        fi
-    else
-        echo "No source control found"
-    fi
-}
-
-command_v() {
-    [ "$#" = 0 ] || cd "$@" || bail "failed to cd $*"
-    print_sep "directory"
-    echo "directory : $(pwd)"
-    if svn info >/dev/null 2>/dev/null; then
-        print_sep "SVN info"
-        svn info
-        print_sep "SVN log"
-        svn log -l 3
-        print_sep "SVN status"
-        svn status
-        print_sep ""
-    elif git status >/dev/null 2>/dev/null; then
-        print_sep "GIT remote"
-        git --no-pager remote -v
-        print_sep "GIT log"
-        git --no-pager log -n 3
-        print_sep "GIT branch (local)"
-        git --no-pager branch -v
-        print_sep "GIT status"
-        git --no-pager status
-        print_sep ""
-    else
-        print_sep ""
-        echo "No source control found"
-        print_sep ""
-    fi
-}
-
 command_s() {
     [ "$#" = 0 ] || cd "$@" || bail "failed to cd $*"
     print_sep "directory"
@@ -402,41 +354,40 @@ commnads)
                 m       md5sum
                 regex   regular expression to match files or directories.
 
-    * directories
-        p [file]    : copy the full path of file (or PWD) into clipboard
+    * clipboard
+        p [file] : copy the full path of file (or PWD) into clipboard
+        cb       : copy stdinout to clipboard
 
-    * external tools search
-        a   : ag for all without .svn and .git
-        at  : grep recurisvely with without .svn and .git
-        fd  : fd for all with case ignored
+    * grep and find
+        a  : ag for all without .svn and .git
+        at : grep recurisvely with without .svn and .git
+        fd : fd for all with case ignored
 
-    * version control utilities
-        s                   : get state of SVN or GIT
-        ge <git options>    : git for each directory
-        v                   : get SVN or GIT branch
+    * version control
+        s                : get state of SVN or GIT
+        ge <git command> : git for each directory
 
-    * utilities
-        r [command]              : repeat command
-        rn [command]             : run with xauthroity
-        rq [command]             : do rn with stdout and stderr redirected to null
-        x <command or directory> : xdg-open by rn
-        sux <command>            : sudo with xauthority
-        cs                       : build cscope
+    * launch
+        r   : repeat command
+        rn  : run with xauthroity
+        rq  : do rn with stdout and stderr redirected to null
+        x   : xdg-open by rn
+        sux : sudo with xauthority
 
-    * alias
-        cb              : clipboard
-        m               : mc with no mouse (alias)
+    * misc.
+        cs : build cscope
+        m  : mc with no mouse (alias)
 
     * management
-        install [target directory]  : install quick commands
-        uninstall                   : uninstall quick commands
-        help                        : help
+        install [target directory] : install quick commands
+        uninstall                  : uninstall quick commands
+        help                       : print usage help
 
 EOF
 
 }
 
-command_list="core|a|b|ge|p|s|t|tm|f|fm|fd|r|d|cs|rn|rq|x|sux|at|v"
+command_list="core|a|b|ge|p|s|t|tm|f|fm|fd|r|cs|rn|rq|x|sux|at"
 
 # parse command
 fcommand="$0"

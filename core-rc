@@ -20,9 +20,11 @@ antigen bundle pip
 antigen bundle zsh-users/zsh-syntax-highlighting
 antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-history-substring-search
+antigen bundle tymm/zsh-directory-history
 antigen bundle zsh-users/zsh-completions
 antigen bundle supercrabtree/k
 antigen bundle le0me55i/zsh-extract
+antigen bundle MichaelAquilina/zsh-auto-notify
 
 # Load the theme.
 antigen theme robbyrussell
