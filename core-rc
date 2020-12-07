@@ -24,7 +24,6 @@ antigen bundle tymm/zsh-directory-history
 antigen bundle zsh-users/zsh-completions
 antigen bundle supercrabtree/k
 antigen bundle le0me55i/zsh-extract
-antigen bundle MichaelAquilina/zsh-auto-notify
 antigen bundle b4b4r07/enhancd
 antigen bundle rupa/z
 antigen bundle clvv/fasd
