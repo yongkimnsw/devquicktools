@@ -61,4 +61,5 @@ alias mv='mv -i'
 alias rm='rm -i'
 
 alias qxsel="xsel --clipboard"
-alias qmc='source /usr/lib/mc/mc-wrapper.sh --nomouse'
+alias qmc="source /usr/lib/mc/mc-wrapper.sh --nomouse"
+alias qgit="qgit --all"

@@ -101,12 +101,19 @@ command_qfind() {
         esac
     done
 
+    local pipe_command3
+    if [ "$pipe_command1" = "cat" ]; then
+        pipe_command3="cat"
+    else
+        pipe_command3="grep $*"
+    fi
+
     mlocate_db=$(find_mlocate_db 2>/dev/null)
-    search_mlocate_db -r "$*" | $pipe_command1 | $pipe_command2 | highlight "^.*/rootfs|/rootfs|$*"
+    search_mlocate_db -r "$*" | $pipe_command1 | $pipe_command3 | $pipe_command2 | highlight "^.*/rootfs|/rootfs|$*"
 }
 
 # build locate database
-command_qbuildloc() {
+command_qbuildlocale() {
     local mlocate_db
     if [ "$#" -gt 0 ]; then
         mlocate_db="$1/mlocate.db"
@@ -210,7 +217,7 @@ command_qrep() {
     done
 }
 
-command_qbcscope() {
+command_qbuildcscope() {
     basedir="$1"
     test -z "$basedir" && basedir=$(pwd)
 
@@ -331,7 +338,7 @@ devquicktools v1.0 <command> [options]
 commnads)
 
     * locale database
-        qbuildloc [dir]
+        qbuildlocale [dir]
             build locate database
 
         qfind[m] <regex> : search locate database for global files and directories
@@ -362,7 +369,7 @@ commnads)
         qsux : sudo with xauthority
 
     * misc.
-        qbcscope : build cscope
+        qbuildcscope : build cscope
 
     * management
         install [target directory] : install quick commands
@@ -377,7 +384,7 @@ EOF
 
 }
 
-command_list="core|sux|qrun|qag|qgrep|qstatus|qbuildloc|qgiteach|qpath|qfind|qfindm|qtm|qlfind|qlfindm|qfd|qbcscope|qrep"
+command_list="core|sux|qrun|qag|qgrep|qstatus|qbuildlocale|qgiteach|qpath|qfind|qfindm|qtm|qlfind|qlfindm|qfd|qbuildcscope|qrep"
 
 # parse command
 fcommand="$0"
