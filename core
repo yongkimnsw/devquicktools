@@ -330,6 +330,44 @@ command_qsux() {
     exec sudo DISPLAY="$DISPLAY" XAUTHORITY=~/.Xauthority "$@"
 }
 
+command_qowrtmake() {
+    # buildopenwrt <openwrt topdir> <package name> <package source dir> <package build dir>
+    local openwrt_topdir="$1"
+    local openwrt_package="$2"
+    local openwrt_src_dir="$3"
+    local openwrt_build_dir="$4"
+
+    [ -d "$openwrt_topdir" ] || bail "wrong OpenWRT topdir specified"
+
+    openwrt_topdir_fname="$(readlink -f "$openwrt_topdir")"
+    [ -n "$openwrt_src_dir" ] || openwrt_src_dir=$(find "$openwrt_topdir_fname"/feeds -type d -path */${openwrt_package}/src)
+    [ -n "$openwrt_build_dir" ] || openwrt_build_dir=$(readlink -f "$openwrt_topdir_fname"/build_dir/target-*/${openwrt_package}-*)
+
+    [ -d "$openwrt_src_dir" ] || bail "cannot find OpenWRT source directroy"
+    [ -d "$openwrt_build_dir" ] || bail "cannot find OpenWRT build directroy"
+
+    cat << EOF
+* info
+TOP DIR   : $openwrt_topdir
+SRC DIR   : $openwrt_src_dir
+BUILD DIR : $openwrt_build_dir
+
+EOF
+
+    cat << EOF
+* build
+CMD: make -C '$openwrt_topdir' 'package/$openwrt_package/compile' V=s
+EOF
+    make -C "$openwrt_topdir" "package/$openwrt_package/compile" V=s 2>&1 | sed -r "s%$openwrt_build_dir(/.*)(:[0-9]+)(:[0-9]+)%$openwrt_src_dir\\1\\2:\\3%p"
+}
+
+command_qowrtclean() {
+    local openwrt_topdir="$1"
+    local openwrt_package="$2"
+
+    make -C "$openwrt_topdir" "package/$openwrt_package/clean" V=s
+}
+
 print_usage() {
     cat <<EOF
 
@@ -371,6 +409,10 @@ commnads)
     * misc.
         qbuildcscope : build cscope
 
+    * build
+        qowrtmake <openwrt topdir> <package name> [package source dir] [package build dir]
+        qowrtclean <openwrt topdir> <package name>
+
     * management
         install [target directory] : install quick commands
         uninstall                  : uninstall quick commands
@@ -384,7 +426,7 @@ EOF
 
 }
 
-command_list="core|qsux|qrun|qag|qgrep|qstatus|qbuildlocale|qgiteach|qpath|qfind|qfindm|qtm|qlfind|qlfindm|qfd|qbuildcscope|qrep"
+command_list="core|qsux|qrun|qag|qgrep|qstatus|qbuildlocale|qgiteach|qpath|qfind|qfindm|qtm|qlfind|qlfindm|qfd|qbuildcscope|qrep|qowrtmake|qowrtclean"
 
 # parse command
 fcommand="$0"
