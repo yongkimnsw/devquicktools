@@ -354,14 +354,15 @@ BUILD DIR : $openwrt_build_dir
 
 EOF
 
+openwrt_src_rdir="$(realpath --relative-to=. "$openwrt_src_dir")"
+
     cat << EOF
 * build
 CMD: make -C '$openwrt_topdir' 'package/$openwrt_package/compile' V=s
 EOF
     make -C "$openwrt_topdir" "package/$openwrt_package/compile" V=s 2>&1 | sed -r \
         "
-            s%$openwrt_build_dir(/.*)(:[0-9]+)(:[0-9]+)%$openwrt_src_dir\\1\\2:\\3%g;
-            s%$openwrt_build_dir%$openwrt_src_dir%g;
+            s%$openwrt_build_dir%$openwrt_src_rdir%g;
         "
 }
 
