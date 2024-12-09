@@ -431,7 +431,7 @@ EOF
 
 }
 
-command_list="core|qsux|qrun|qag|qgrep|qstatus|qbuildlocale|qgiteach|qpath|qfind|qfindm|qtm|qlfind|qlfindm|qfd|qbuildcscope|qrep|qowrtmake|qowrtclean"
+command_list="core|qsux|qrun|qag|qgrep|qstatus|qbuildlocale|qgiteach|qpath|qfind|qfindm|qlfind|qlfindm|qfd|qbuildcscope|qrep|qowrtmake|qowrtclean"
 
 # parse command
 fcommand="$0"
