@@ -251,6 +251,8 @@ command_qbuildcscope() {
     #cscope -buvq
     cscope -buv
     readlink -f cscope.out
+    ctags -R .
+    readlink -f tags
 }
 
 command_core() {
