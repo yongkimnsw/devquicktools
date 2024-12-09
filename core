@@ -198,7 +198,7 @@ command_qgiteach() {
 }
 
 command_qfd() {
-    /bin/fd -IHp "$@"
+    /bin/fdfind -IHp "$@"
 }
 
 kill_children() {
